@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "lint": "biome lint && node scripts/max-lines.mjs",
+    "lint": "biome lint && node scripts/max-lines.mjs && pnpm sanity",
+    "sanity": "node scripts/repo-sanity.mjs",
     "check": "pnpm lint && pnpm test && pnpm build",
     "format": "biome format --write",
     "start": "vite-node server/index.ts"
