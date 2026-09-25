@@ -1,4 +1,4 @@
-name: Deploy
+name: GrangeGame Deploy
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-production
+  group: grangegame-deploy-production
   cancel-in-progress: false
 
 env:
-  DEPLOY_HOST: ettin.homework.quest
+  DEPLOY_HOST: grangegame.com
   DEPLOY_USER: grange
   DEPLOY_PATH: /home/grange/grange
   APP_PORT: "3200"
@@ -19,6 +19,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +41,7 @@ jobs:
       - name: Load deploy key
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.SSH_KEY }}
+          ssh-private-key: ${{ secrets.GRANGEGAME_SSH_KEY }}
 
       - name: Trust host key
         run: ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
