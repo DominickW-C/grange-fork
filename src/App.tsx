@@ -1,6 +1,5 @@
 import { Route, Routes } from "react-router-dom";
 import Dashboard from "./routes/Dashboard";
-import Game from "./routes/Game";
 import Login from "./routes/Login";
 import RequireAuth from "./routes/RequireAuth";
 import FarmMap from "./world/FarmMap";
@@ -18,18 +17,18 @@ export default function App() {
 				}
 			/>
 			<Route
-				path="/dashboard"
+				path="/farms/:owner"
 				element={
 					<RequireAuth>
-						<Dashboard />
+						<FarmMap />
 					</RequireAuth>
 				}
 			/>
 			<Route
-				path="/games/:uuid"
+				path="/dashboard"
 				element={
 					<RequireAuth>
-						<Game />
+						<Dashboard />
 					</RequireAuth>
 				}
 			/>

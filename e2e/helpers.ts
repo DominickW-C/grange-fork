@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-export const BASE = "http://localhost:3000";
+export const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3201";
 
 /** Unique suffix so tests don't collide with each other or prior runs. */
 export function uniqueName(base: string): string {

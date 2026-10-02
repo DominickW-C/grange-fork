@@ -1,11 +1,12 @@
 import type { AuthUser } from "../shared/auth";
-import { rebindAuth } from "./socket";
+import { rebindAuth, setAuthToken } from "./socket";
 import { useGameStore } from "./store";
 
 export interface AuthResponse {
 	ok: boolean;
 	error?: string;
 	user?: AuthUser;
+	token?: string;
 }
 
 async function post(
@@ -24,6 +25,7 @@ async function post(
 function accept(data: AuthResponse): AuthResponse {
 	if (data.ok && data.user) {
 		useGameStore.getState().setUser(data.user);
+		setAuthToken(data.token ?? null);
 		rebindAuth();
 	}
 	return data;
@@ -47,6 +49,7 @@ export async function login(input: {
 export async function logout(): Promise<void> {
 	await post("/logout", {});
 	useGameStore.getState().clearUser();
+	setAuthToken(null);
 	rebindAuth();
 }
 
@@ -55,9 +58,15 @@ export async function fetchMe(): Promise<AuthUser | null> {
 	const res = await fetch("/api/auth/me", { credentials: "same-origin" });
 	if (!res.ok) {
 		useGameStore.getState().clearUser();
+		setAuthToken(null);
 		return null;
 	}
-	const { user } = (await res.json()) as { user: AuthUser };
+	const { user, token } = (await res.json()) as {
+		user: AuthUser;
+		token: string;
+	};
 	useGameStore.getState().setUser(user);
+	setAuthToken(token);
+	rebindAuth();
 	return user;
 }
