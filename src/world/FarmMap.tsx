@@ -1,17 +1,43 @@
 import * as ex from "excalibur";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { FarmToolId } from "../../shared/farm";
 import { logout } from "../auth";
 import { useGameStore } from "../store";
-import { FarmMapScene } from "./FarmMapScene";
+import { FarmMapScene, type FarmHudSnapshot } from "./FarmMapScene";
 import "./farmMap.css";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { resources } from "./resources";
 
+const TOOLS: Array<{ id: FarmToolId; label: string; key: string }> = [
+	{ id: "hoe", label: "Hoe", key: "1" },
+	{ id: "seed", label: "Seeds", key: "2" },
+	{ id: "bucket", label: "Bucket", key: "3" },
+	{ id: "scythe", label: "Scythe", key: "4" },
+];
+
+const TOOL_BY_KEY: Record<string, FarmToolId> = {
+	Digit1: "hoe",
+	Digit2: "seed",
+	Digit3: "bucket",
+	Digit4: "scythe",
+	Numpad1: "hoe",
+	Numpad2: "seed",
+	Numpad3: "bucket",
+	Numpad4: "scythe",
+};
+
 export default function FarmMap() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const sceneRef = useRef<FarmMapScene | null>(null);
 	const username = useGameStore((s) => s.username);
 	const navigate = useNavigate();
+	const [tool, setTool] = useState<FarmToolId>("hoe");
+	const [hud, setHud] = useState<FarmHudSnapshot>({
+		tomatoes: 0,
+		message: "Hoe: click or drag on grass to till.",
+		hovered: null,
+	});
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -28,7 +54,10 @@ export default function FarmMap() {
 			backgroundColor: ex.Color.fromHex("#79a44d"),
 		});
 
-		engine.addScene("farm-map", new FarmMapScene());
+		const scene = new FarmMapScene();
+		scene.onFarmUpdate = (snapshot) => setHud(snapshot);
+		sceneRef.current = scene;
+		engine.addScene("farm-map", scene);
 		void Promise.all(resources.map((resource) => resource.load())).then(
 			async () => {
 				if (cancelled) return;
@@ -39,10 +68,24 @@ export default function FarmMap() {
 
 		return () => {
 			cancelled = true;
+			sceneRef.current = null;
 			engine.stop();
 			engine.dispose();
 		};
 	}, []);
+
+	useEffect(() => {
+		function onKeyDown(event: KeyboardEvent) {
+			const next = TOOL_BY_KEY[event.code];
+			if (next) setTool(next);
+		}
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, []);
+
+	useEffect(() => {
+		sceneRef.current?.setTool(tool);
+	}, [tool]);
 
 	async function onSignOut() {
 		await logout();
@@ -54,7 +97,7 @@ export default function FarmMap() {
 			<canvas
 				ref={canvasRef}
 				className="farm-map-canvas"
-				aria-label="Farm map with buildings, an empty field, paths, trees, and water"
+				aria-label="Farm map. Press 1-4 to switch tools, then click a tile."
 			/>
 			<div className="farm-map-bar">
 				<span className="farm-map-user" data-testid="farm-map-user">
@@ -68,6 +111,37 @@ export default function FarmMap() {
 				>
 					Sign out
 				</button>
+			</div>
+			<div className="farm-hud" data-testid="farm-hud">
+				<div className="farm-tools" role="toolbar" aria-label="Farming tools">
+					{TOOLS.map((entry) => (
+						<button
+							key={entry.id}
+							type="button"
+							data-testid={`tool-${entry.id}`}
+							aria-pressed={tool === entry.id}
+							className={
+								tool === entry.id
+									? "farm-tool farm-tool-active"
+									: "farm-tool"
+							}
+							onClick={() => setTool(entry.id)}
+						>
+							<span className="farm-tool-key">{entry.key}</span> {entry.label}
+						</button>
+					))}
+				</div>
+				<div className="farm-status">
+					<span data-testid="farm-tomatoes">🍅 {hud.tomatoes}</span>
+					<span data-testid="farm-tile">
+						{hud.hovered
+							? `(${hud.hovered.column}, ${hud.hovered.row}): ${hud.hovered.state}`
+							: "—"}
+					</span>
+				</div>
+				<p className="farm-hint" data-testid="farm-hint">
+					{hud.message}
+				</p>
 			</div>
 		</main>
 	);
