@@ -1,7 +1,6 @@
 import * as ex from "excalibur";
 import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
-import type { FarmAction } from "../../shared/types";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
 import {
@@ -24,39 +23,9 @@ import {
 	terrainAt,
 } from "./mapData";
 import { propImages, terrainFrames, terrainImage } from "./resources";
-
-export interface FarmHoveredTile {
-	column: number;
-	row: number;
-	state: string;
-}
-
-export interface FarmHudSnapshot {
-	tomatoes: number;
-	message: string;
-	hovered: FarmHoveredTile | null;
-}
-
-const TOOL_HINTS: Record<FarmToolId, string> = {
-	hoe: "Hoe: click or drag on grass to till.",
-	seed: "Seeds: click tilled soil to plant tomato.",
-	bucket: "Bucket: click a sprout to water it.",
-	scythe: "Scythe: click a ripe tomato plant to harvest.",
-};
-
-const TOOL_KEYS: Record<string, FarmToolId> = {
-	Digit1: "hoe",
-	Digit2: "seed",
-	Digit3: "bucket",
-	Digit4: "scythe",
-};
-
-const TOOL_KIND: Record<FarmToolId, FarmAction["kind"]> = {
-	hoe: "till",
-	seed: "plant",
-	bucket: "water",
-	scythe: "harvest",
-};
+import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
+import { TOOL_HINTS, TOOL_KEYS, TOOL_KIND } from "./farmTools";
+import { clearDecorAt, refreshTile } from "./tileSync";
 
 export class FarmMapScene extends ex.Scene {
 	onFarmUpdate: ((snapshot: FarmHudSnapshot) => void) | null = null;
@@ -314,8 +283,8 @@ export class FarmMapScene extends ex.Scene {
 				live.add(key);
 				if (this.synced.get(key) === tile.state) continue;
 				this.synced.set(key, tile.state);
-				this.refreshTile(tile.x, tile.y, tile.state);
-				this.clearDecorAt(key);
+				refreshTile(this.terrain, this.sheet, this.crops, tile.x, tile.y, tile.state);
+				clearDecorAt(this.decor, this.propActors, props, key);
 				changed = true;
 			}
 			if (farm.tomatoes !== this.lastTomatoes) {
@@ -327,7 +296,7 @@ export class FarmMapScene extends ex.Scene {
 		for (const key of [...this.synced.keys()]) {
 			if (!live.has(key)) {
 				const [fx, fy] = key.split(",").map(Number);
-				this.refreshTile(fx, fy, undefined);
+				refreshTile(this.terrain, this.sheet, this.crops, fx, fy, undefined);
 				this.synced.delete(key);
 				changed = true;
 			}
@@ -340,21 +309,6 @@ export class FarmMapScene extends ex.Scene {
 			if (this.lastWorldPos) this.updateHover(this.lastWorldPos);
 			else this.emitHud();
 		}
-	}
-
-	/** Removes tilled-over decor (flowers) on a tile. Returns the removed
-	 * asset keys so a future pickup feature can credit them to inventory. */
-	private clearDecorAt(strokeKey: string): string[] {
-		const indices = this.decor.get(strokeKey);
-		if (!indices) return [];
-		this.decor.delete(strokeKey);
-		const cleared: string[] = [];
-		for (const index of indices) {
-			this.propActors[index]?.kill();
-			this.propActors[index] = undefined;
-			cleared.push(props[index].asset);
-		}
-		return cleared;
 	}
 
 	private updateHover(worldPos: ex.Vector): void {
@@ -373,28 +327,6 @@ export class FarmMapScene extends ex.Scene {
 			};
 		}
 		this.emitHud();
-	}
-
-	private refreshTile(
-		column: number,
-		row: number,
-		state: FarmTileState | undefined,
-	): void {
-		const tile = this.terrain.getTile(column, row);
-		if (!tile) return;
-		tile.clearGraphics();
-		if (!state) {
-			const frame = terrainFrames[terrainAt(column, row)];
-			tile.addGraphic(this.sheet.getSprite(frame.column, frame.row));
-		} else {
-			const soil =
-				state === "planted" || state === "tilled"
-					? "tilled-dry"
-					: "tilled-watered";
-			const frame = terrainFrames[soil];
-			tile.addGraphic(this.sheet.getSprite(frame.column, frame.row));
-		}
-		this.crops.sync(column, row, state);
 	}
 
 	private emitHud(): void {
