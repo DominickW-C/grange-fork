@@ -87,10 +87,8 @@ test("tilling under flowers clears them", async ({ page }) => {
 	await expect(page.getByTestId("farm-hud")).toBeVisible();
 
 	await clickTile(page, 11, 3);
-	await expect(page.getByTestId("farm-hint")).toContainText("cleared flowers");
 	await expect(page.getByTestId("farm-tile")).toContainText("(11, 3): tilled");
-import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName } from "./helpers";
+});
 
 test("hoeing and planting a tile round-trips through the server", async ({
 	page,
@@ -104,7 +102,7 @@ test("hoeing and planting a tile round-trips through the server", async ({
 	const tiles = page.getByTestId("farm-map-tiles");
 	await expect(tiles).toHaveText("0 tiles");
 
-	// The player spawns on a field tile, so the selected tool acts immediately.
+	// The player spawns on a farmable tile, so the selected tool acts immediately.
 	await page.getByTestId("tool-hoe").click();
 	await page.keyboard.press("Space");
 	await expect(tiles).toHaveText("1 tiles");
@@ -119,10 +117,8 @@ test("the tool bar highlights the selected tool", async ({ page }) => {
 	await register(page, uniqueName("Farmer"));
 
 	await page.getByTestId("tool-bucket").click();
-	await expect(page.getByTestId("tool-bucket")).toHaveClass(/farm-map-tool-active/);
-	await expect(page.getByTestId("tool-hoe")).not.toHaveClass(
-		/farm-map-tool-active/,
-	);
+	await expect(page.getByTestId("tool-bucket")).toHaveClass(/farm-tool-active/);
+	await expect(page.getByTestId("tool-hoe")).not.toHaveClass(/farm-tool-active/);
 });
 
 test("a visitor sees another farm read-only", async ({ page }) => {

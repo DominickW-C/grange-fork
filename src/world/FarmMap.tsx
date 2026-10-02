@@ -1,6 +1,6 @@
 import * as ex from "excalibur";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import type { FarmToolId } from "../../shared/farm";
 import { logout } from "../auth";
 import { emitLeaveFarm, emitVisitFarm } from "../socket";
@@ -37,7 +37,6 @@ export default function FarmMap() {
 	const setTool = useGameStore((s) => s.setTool);
 	const { owner } = useParams<{ owner?: string }>();
 	const navigate = useNavigate();
-	const [tool, setTool] = useState<FarmToolId>("hoe");
 	const [hud, setHud] = useState<FarmHudSnapshot>({
 		tomatoes: 0,
 		message: "Hoe: click or drag on grass to till.",
@@ -72,7 +71,7 @@ export default function FarmMap() {
 			backgroundColor: ex.Color.fromHex("#79a44d"),
 		});
 
-		const scene = new FarmMapScene();
+		const scene = new FarmMapScene(target, isOwner);
 		scene.onFarmUpdate = (snapshot) => setHud(snapshot);
 		sceneRef.current = scene;
 		engine.addScene("farm-map", scene);
@@ -99,7 +98,7 @@ export default function FarmMap() {
 		}
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, []);
+	}, [setTool]);
 
 	useEffect(() => {
 		sceneRef.current?.setTool(tool);
@@ -143,24 +142,26 @@ export default function FarmMap() {
 				</button>
 			</div>
 			<div className="farm-hud" data-testid="farm-hud">
-				<div className="farm-tools" role="toolbar" aria-label="Farming tools">
-					{TOOLS.map((entry) => (
-						<button
-							key={entry.id}
-							type="button"
-							data-testid={`tool-${entry.id}`}
-							aria-pressed={tool === entry.id}
-							className={
-								tool === entry.id
-									? "farm-tool farm-tool-active"
-									: "farm-tool"
-							}
-							onClick={() => setTool(entry.id)}
-						>
-							<span className="farm-tool-key">{entry.key}</span> {entry.label}
-						</button>
-					))}
-				</div>
+				{isOwner ? (
+					<div className="farm-tools" role="toolbar" aria-label="Farming tools">
+						{TOOLS.map((entry) => (
+							<button
+								key={entry.id}
+								type="button"
+								data-testid={`tool-${entry.id}`}
+								aria-pressed={tool === entry.id}
+								className={
+									tool === entry.id
+										? "farm-tool farm-tool-active"
+										: "farm-tool"
+								}
+								onClick={() => setTool(entry.id)}
+							>
+								<span className="farm-tool-key">{entry.key}</span> {entry.label}
+							</button>
+						))}
+					</div>
+				) : null}
 				<div className="farm-status">
 					<span data-testid="farm-tomatoes">🍅 {hud.tomatoes}</span>
 					<span data-testid="farm-tile">
