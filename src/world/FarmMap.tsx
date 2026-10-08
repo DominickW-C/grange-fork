@@ -5,6 +5,7 @@ import type { FarmToolId } from "../../shared/farm";
 import { logout } from "../auth";
 import { emitLeaveFarm, emitVisitFarm } from "../socket";
 import { useGameStore } from "../store";
+import { BlackjackOverlay } from "./BlackjackOverlay";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
 import { EconomyHUD } from "./EconomyHUD";
@@ -42,6 +43,7 @@ const TOOL_BY_KEY: Record<string, FarmToolId> = {
 export default function FarmMap() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const sceneRef = useRef<FarmMapScene | null>(null);
+	const casinoRef = useRef<CasinoScene | null>(null);
 	const username = useGameStore((s) => s.username);
 	const farm = useGameStore((s) => s.activeFarm);
 	const tool = useGameStore((s) => s.tool);
@@ -68,6 +70,7 @@ export default function FarmMap() {
 	}, [target, navigate]);
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
+	const [blackjackOpen, setBlackjackOpen] = useState(false);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -92,7 +95,12 @@ export default function FarmMap() {
 			"marketplace",
 			new MarketplaceScene(setTravelPrompt, setArea),
 		);
-		engine.addScene("casino", new CasinoScene(setTravelPrompt, setArea));
+		const casino = new CasinoScene(setTravelPrompt, setArea, () => {
+			casino.setPaused(true);
+			setBlackjackOpen(true);
+		});
+		casinoRef.current = casino;
+		engine.addScene("casino", casino);
 		void Promise.all(worldResources.map((resource) => resource.load())).then(
 			async () => {
 				if (cancelled) return;
@@ -104,6 +112,7 @@ export default function FarmMap() {
 		return () => {
 			cancelled = true;
 			sceneRef.current = null;
+			casinoRef.current = null;
 			engine.stop();
 			engine.dispose();
 		};
@@ -125,6 +134,11 @@ export default function FarmMap() {
 	async function onSignOut() {
 		await logout();
 		navigate("/", { replace: true });
+	}
+
+	function closeBlackjack() {
+		casinoRef.current?.setPaused(false);
+		setBlackjackOpen(false);
 	}
 
 	return (
@@ -205,6 +219,7 @@ export default function FarmMap() {
 					</p>
 				</div>
 			)}
+			{blackjackOpen && <BlackjackOverlay onClose={closeBlackjack} />}
 		</main>
 	);
 }

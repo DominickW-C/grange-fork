@@ -13,10 +13,12 @@ export interface SceneSpawn {
 
 export interface SceneInteraction {
 	position: ex.Vector;
-	destination: WorldSceneName;
+	destination?: WorldSceneName;
 	prompt: string;
 	radius?: number;
 	destinationSpawn?: SceneSpawn;
+	/** Runs instead of scene travel when the interaction is triggered. */
+	action?: () => void;
 }
 
 interface SceneActivationData {
@@ -36,6 +38,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 	protected inputManager?: InputManager;
 	private activePrompt: string | null = null;
 	private traveling = false;
+	private paused = false;
 	private readonly playerSpeed = 160;
 
 	constructor(private readonly options: WalkingSceneOptions) {
@@ -64,12 +67,27 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			: this.options.spawn.clone();
 		this.inputManager = new InputManager();
 		this.traveling = false;
+		this.paused = false;
 		this.options.onAreaChange(this.options.area);
 		this.setPrompt(null);
 	}
 
+	/** Freezes movement and input while a DOM overlay owns the screen. */
+	setPaused(paused: boolean): void {
+		if (this.paused === paused) return;
+		this.paused = paused;
+		if (paused) {
+			this.inputManager?.destroy();
+			this.inputManager = undefined;
+			this.player.vel = ex.Vector.Zero;
+			this.setPrompt(null);
+		} else {
+			this.inputManager = new InputManager();
+		}
+	}
+
 	override onPreUpdate(engine: ex.Engine): void {
-		if (!this.inputManager) return;
+		if (!this.inputManager || this.paused) return;
 		const direction = this.inputManager.getMovementVector();
 		updateWalkingPlayer(this.player, direction, this.playerSpeed);
 
@@ -84,8 +102,13 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			!this.traveling &&
 			this.inputManager.consumePress("KeyE", "Enter")
 		) {
-			this.traveling = true;
 			this.setPrompt(null);
+			if (interaction.action) {
+				interaction.action();
+				return;
+			}
+			if (!interaction.destination) return;
+			this.traveling = true;
 			void engine.goToScene(interaction.destination, {
 				sceneActivationData: { spawn: interaction.destinationSpawn },
 			});
