@@ -134,7 +134,7 @@
 
 .bj-deal-in {
 	z-index: 6;
-	animation: bj-deal-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	animation: bj-deal-in 0.55s cubic-bezier(0.33, 0.1, 0.25, 1) both;
 	animation-delay: var(--deal-delay, 0ms);
 }
 
@@ -142,7 +142,7 @@
 	from {
 		transform: translate(var(--deal-x, 0), var(--deal-y, 0)) rotate(-10deg)
 			scale(0.9);
-		opacity: 0.3;
+		opacity: 0.9;
 	}
 	to {
 		transform: translate(0, 0) rotate(0deg) scale(1);
@@ -150,13 +150,20 @@
 	}
 }
 
-@media (prefers-reduced-motion: reduce) {
-	.bj-card-inner {
-		transition: none;
-	}
+/* A freshly dealt face-up card starts showing its back and flips to its face
+   while it flies in from the deck. Timing matches bj-deal-in so the flip
+   completes as the card lands. */
+.bj-flip-in .bj-card-inner {
+	animation: bj-flip-in 0.55s cubic-bezier(0.33, 0.1, 0.25, 1) both;
+	animation-delay: var(--deal-delay, 0ms);
+}
 
-	.bj-deal-in {
-		animation: none;
+@keyframes bj-flip-in {
+	from {
+		transform: rotateY(180deg);
+	}
+	to {
+		transform: rotateY(0deg);
 	}
 }
 
@@ -202,6 +209,7 @@
 
 .bj-deck img {
 	position: relative;
+	z-index: 1;
 	display: block;
 	width: 100%;
 	height: 100%;

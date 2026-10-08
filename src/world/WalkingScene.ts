@@ -13,9 +13,10 @@ export interface SceneSpawn {
 
 export interface SceneInteraction {
 	position: ex.Vector;
-	destination?: WorldSceneName;
 	prompt: string;
 	radius?: number;
+	/** Travel to another scene when pressed. Omit for an in-place action. */
+	destination?: WorldSceneName;
 	destinationSpawn?: SceneSpawn;
 	/** Runs instead of scene travel when the interaction is triggered. */
 	action?: () => void;
