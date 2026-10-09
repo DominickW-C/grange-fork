@@ -1,9 +1,9 @@
 import * as ex from "excalibur";
 import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
+import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
-import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import {
 	BlockRegistry,
 	decorByTile,
@@ -12,23 +12,23 @@ import {
 } from "./blocking";
 import { CropLayer } from "./cropLayer";
 import { FarmTravel } from "./FarmTravel";
+import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
+import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
 import { InputManager } from "./InputManager";
 import {
 	FARM_PLAYER_SPAWN,
+	isTillableTile,
 	MAP_COLUMNS,
 	MAP_HEIGHT,
 	MAP_ROWS,
 	MAP_WIDTH,
-	TILE_SIZE,
-	isTillableTile,
 	propBlocking,
 	props,
+	TILE_SIZE,
 	terrainAt,
 } from "./mapData";
+import { updateFarmPlayer } from "./playerMovement";
 import { propImages, terrainFrames, terrainImage } from "./resources";
-import { updateWalkingPlayer } from "./playerMovement";
-import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
-import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
 import { clearDecorAt, refreshTile } from "./tileSync";
 import type { WorldArea } from "./WalkingScene";
 
@@ -37,7 +37,6 @@ export class FarmMapScene extends ex.Scene {
 
 	private inputManager!: InputManager;
 	private player!: ex.Actor;
-	private readonly playerSpeed = 160; // Pixels per second
 
 	private sheet!: ex.SpriteSheet;
 	private terrain!: ex.TileMap;
@@ -183,7 +182,7 @@ export class FarmMapScene extends ex.Scene {
 		this.travel.activate();
 	}
 
-	override onPreUpdate(engine: ex.Engine, _delta: number): void {
+	override onPreUpdate(engine: ex.Engine, delta: number): void {
 		// Freeze movement while the inventory modal captures input.
 		if (isInventoryBlockingInput()) {
 			this.player.vel = ex.vec(0, 0);
@@ -193,7 +192,7 @@ export class FarmMapScene extends ex.Scene {
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
-		updateWalkingPlayer(this.player, dir, this.playerSpeed);
+		updateFarmPlayer(this.player, dir, delta);
 
 		this.travel.update(this.player, this.inputManager, engine);
 
