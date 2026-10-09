@@ -200,8 +200,6 @@ test("farm world shows the starting balance HUD", async ({ page }) => {
 	await expect(balance).toContainText("100");
 });
 
-<<<<<<< HEAD
-=======
 test("selling a chosen number of tomatoes uses the quantity stepper", async ({
 	page,
 }) => {
@@ -264,7 +262,6 @@ test("selling a chosen number of tomatoes uses the quantity stepper", async ({
 	await expect(page.getByTestId("market-action-tomato")).toBeDisabled();
 });
 
->>>>>>> 08f85c1acc4a3a2f89df7bf2b76ca300b6a81c3e
 test("balance belongs to the account and starts fresh for a new one", async ({
 	page,
 }) => {

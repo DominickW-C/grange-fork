@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 export const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3201";
 
@@ -44,4 +44,29 @@ export async function login(
 	await page.getByTestId("password").fill(password);
 	await page.getByRole("button", { name: /Sign In/i }).click();
 	await page.waitForURL("**/world");
+}
+
+/** Walks from the farm spawn through the marketplace and into the casino. */
+export async function walkToCasino(page: Page): Promise<void> {
+	const canvas = page.locator("canvas");
+	const prompt = page.getByTestId("travel-prompt");
+
+	await page.keyboard.down("d");
+	await page.waitForTimeout(1_000);
+	await page.keyboard.up("d");
+	await expect(prompt).toContainText("travel to the marketplace");
+	await page.keyboard.press("e");
+	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+
+	await page.keyboard.down("w");
+	await page.keyboard.down("d");
+	await page.waitForTimeout(2_900);
+	await page.keyboard.up("w");
+	await page.keyboard.up("d");
+	await page.keyboard.down("d");
+	await page.waitForTimeout(1_200);
+	await page.keyboard.up("d");
+	await expect(prompt).toContainText("enter the casino");
+	await page.keyboard.press("e");
+	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
 }
