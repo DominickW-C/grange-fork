@@ -24,6 +24,7 @@ import { MarketWindow } from "./MarketWindow";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { MARKETS } from "./marketData";
 import { marketplaceResources } from "./marketplaceResources";
+import { PokerOverlay } from "./PokerOverlay";
 import { RouletteOverlay } from "./RouletteOverlay";
 import { resources } from "./resources";
 import { useFarmMarket } from "./useFarmMarket";
@@ -124,15 +125,16 @@ export default function FarmMap() {
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 	const [blackjackOpen, setBlackjackOpen] = useState(false);
+	const [pokerOpen, setPokerOpen] = useState(false);
 	const [rouletteOpen, setRouletteOpen] = useState(false);
-	const [worldReady, setWorldReady] = useState(false);
+	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas || !target) return;
 
 		let cancelled = false;
-		setWorldReady(false);
+		setEngineReady(false);
 		const engine = new ex.Engine({
 			canvasElement: canvas,
 			viewport: { width: MAP_WIDTH, height: MAP_HEIGHT },
@@ -147,7 +149,7 @@ export default function FarmMap() {
 		scene.onFarmUpdate = (snapshot) => {
 			if (cancelled) return;
 			setHud(snapshot);
-			setWorldReady(true);
+			setEngineReady(true);
 		};
 		sceneRef.current = scene;
 		engine.addScene("farm-map", scene);
@@ -164,6 +166,10 @@ export default function FarmMap() {
 			() => {
 				casino.setPaused(true);
 				setBlackjackOpen(true);
+			},
+			() => {
+				casino.setPaused(true);
+				setPokerOpen(true);
 			},
 			() => {
 				casino.setPaused(true);
@@ -233,8 +239,13 @@ export default function FarmMap() {
 	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
 		setBlackjackOpen(false);
+		setPokerOpen(false);
 		setRouletteOpen(false);
 	}
+
+	// The farm channel join is what sets `farm`; until it lands, an action would
+	// be dropped by emitFarmAction, so the world isn't interactive yet.
+	const worldReady = engineReady && farm !== null;
 
 	return (
 		<main
@@ -298,6 +309,7 @@ export default function FarmMap() {
 			<InventoryPanel />
 			{paused && <PauseMenu />}
 			{blackjackOpen && <BlackjackOverlay onClose={closeCasinoOverlay} />}
+			{pokerOpen && <PokerOverlay onClose={closeCasinoOverlay} />}
 			{rouletteOpen && <RouletteOverlay onClose={closeCasinoOverlay} />}
 		</main>
 	);
