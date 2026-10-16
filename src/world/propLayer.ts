@@ -4,12 +4,8 @@ import {
 	groundFootprintTiles,
 	rectFootprintTiles,
 } from "./blocking";
-import { type PropKey, propBlocking, props } from "./mapData";
+import { ANIMATED_PROPS, propBlocking, props } from "./mapData";
 import { propImages } from "./resources";
-
-/** Props the scene animates itself (the train), so the layer skips drawing
- * them — but still registers the tiles they block. */
-const ANIMATED_PROPS = new Set<PropKey>(["starter-train"]);
 
 /**
  * Adds every farm prop to the scene and registers the tiles it blocks. Fences

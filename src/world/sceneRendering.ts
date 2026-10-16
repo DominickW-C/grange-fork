@@ -1,5 +1,11 @@
 import * as ex from "excalibur";
-import { MAP_COLUMNS, MAP_ROWS, TILE_SIZE, type TerrainKey } from "./mapData";
+import {
+	ANIMATED_PROPS,
+	MAP_COLUMNS,
+	MAP_ROWS,
+	type TerrainKey,
+	TILE_SIZE,
+} from "./mapData";
 import { terrainFrames, terrainImage } from "./resources";
 
 export interface RenderedProp<Asset extends string> {
@@ -42,9 +48,7 @@ export function addTerrain(
 	scene.add(terrain);
 }
 
-/** Props the scene animates itself (the train), so prop rendering skips them. */
-const ANIMATED_PROPS = new Set<string>(["starter-train"]);
-
+/** Draws each prop's still sprite, skipping any the scene animates itself. */
 export function addProps<Asset extends string>(
 	scene: ex.Scene,
 	props: RenderedProp<Asset>[],
