@@ -10,7 +10,7 @@ export const image = (path: string) =>
 
 export const terrainImage = image("farm/terrain.webp");
 export const trainImage = image("transport/starter-train.webp");
-export const trainTracksImage = image("transport/train-tracks.png");
+export const trainTracksImage = image("transport/train-tracks.webp");
 /** The two extra wheel poses the train cycles through while it is moving. The
  * parked art (`trainImage`) is the third pose, so the loop reads end to end. */
 export const trainFrameImages = [
