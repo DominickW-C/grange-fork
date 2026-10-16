@@ -1,40 +1,13 @@
-import { expect, test, type Page } from "@playwright/test";
-import { register, resetServer, uniqueName } from "./helpers";
-
-async function clickTile(page: Page, col: number, row: number) {
-	const canvas = page.locator(".farm-map-canvas");
-	const box = await canvas.boundingBox();
-	expect(box).not.toBeNull();
-	const x = box!.x + ((col + 0.5) / 18) * box!.width;
-	const y = box!.y + ((row + 0.5) / 12) * box!.height;
-	await page.mouse.click(x, y);
-}
-
-/** Samples a rendered tile's center pixel from a canvas screenshot. */
-async function tilePixel(page: Page, col: number, row: number) {
-	const buf = await page.locator(".farm-map-canvas").screenshot();
-	const b64 = buf.toString("base64");
-	return page.evaluate(
-		async ({ b64, xf, yf }) => {
-			const img = new Image();
-			img.src = `data:image/png;base64,${b64}`;
-			await img.decode();
-			const canvas = document.createElement("canvas");
-			canvas.width = img.width;
-			canvas.height = img.height;
-			const ctx = canvas.getContext("2d")!;
-			ctx.drawImage(img, 0, 0);
-			const d = ctx.getImageData(
-				Math.floor(xf * img.width),
-				Math.floor(yf * img.height),
-				1,
-				1,
-			).data;
-			return { r: d[0], g: d[1], b: d[2] };
-		},
-		{ b64, xf: (col + 0.5) / 18, yf: (row + 0.5) / 12 },
-	);
-}
+import { expect, test } from "@playwright/test";
+import {
+	clickFarmTile,
+	farmTilePixel,
+	farmTilePosition,
+	hoverFarmTile,
+	register,
+	resetServer,
+	uniqueName,
+} from "./helpers";
 
 test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	await resetServer();
@@ -45,13 +18,13 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	await expect(page.getByTestId("slot-hotbar-0")).toHaveClass(/inv-slot-selected/);
 
 	// Hoe tile (9, 7)
-	await clickTile(page, 9, 7);
+	await clickFarmTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
 
 	// Seeds (hotbar slot 2 maps to key "2")
 	await page.keyboard.press("2");
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveClass(/inv-slot-selected/);
-	await clickTile(page, 9, 7);
+	await clickFarmTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): planted");
 	// Planting spends one tomato seed from the pouch (10 -> 9).
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
@@ -61,7 +34,7 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 
 	// Bucket
 	await page.keyboard.press("3");
-	await clickTile(page, 9, 7);
+	await clickFarmTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): watered");
 
 	// Wait for 10s growth, then harvest
@@ -69,7 +42,7 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 		timeout: 20_000,
 	});
 	await page.keyboard.press("4");
-	await clickTile(page, 9, 7);
+	await clickFarmTile(page, 9, 7);
 	// Harvested tomatoes land in the first free inventory slot: hotbar 5 (tomato)
 	// receives the 3-tomato yield.
 	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
@@ -80,15 +53,58 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 
 	// Drag-paint tills two tiles at once
 	await page.keyboard.press("1");
-	const canvas = page.locator(".farm-map-canvas");
-	const box = await canvas.boundingBox();
-	const px = (c: number) => box!.x + ((c + 0.5) / 18) * box!.width;
-	const py = (r: number) => box!.y + ((r + 0.5) / 12) * box!.height;
-	await page.mouse.move(px(7), py(6));
+	const from = await farmTilePosition(page, 7, 6);
+	const to = await farmTilePosition(page, 8, 6);
+	await page.mouse.move(from.x, from.y);
 	await page.mouse.down();
-	await page.mouse.move(px(8), py(6), { steps: 5 });
+	await page.mouse.move(to.x, to.y, { steps: 5 });
 	await page.mouse.up();
 	await expect(page.getByTestId("farm-tile")).toContainText("(8, 6): tilled");
+});
+
+// Focused regression guard for the core farming verb: select the hoe, click an
+// open square, and require the server to flip it to tilled. Kept small and
+// fast so a broken click->till path fails here loudly instead of inside the
+// long, growth-timed farming-loop test above.
+test("hoe click tills an open grass square and a flower square", async ({
+	page,
+}) => {
+	await resetServer();
+	await register(page, uniqueName("Hoer"));
+	await expect(page).toHaveURL(/\/world$/);
+
+	// The hotbar starts on the hoe.
+	await expect(page.getByTestId("slot-hotbar-0")).toHaveClass(
+		/inv-slot-selected/,
+	);
+	const tiles = page.getByTestId("farm-map-tiles");
+	await expect(tiles).toHaveText("0 tiles");
+
+	// Plain open grass square. Hover first and require the readout to name the
+	// tile we mean to click, so a drifted canvas layout fails here rather than
+	// silently hoeing a different square.
+	const grass = { column: 9, row: 7 };
+	await hoverFarmTile(page, grass.column, grass.row);
+	await expect(page.getByTestId("farm-tile")).toContainText(
+		`(${grass.column}, ${grass.row}):`,
+	);
+	await clickFarmTile(page, grass.column, grass.row);
+	await expect(page.getByTestId("farm-tile")).toContainText(
+		`(${grass.column}, ${grass.row}): tilled`,
+	);
+	await expect(tiles).toHaveText("1 tiles");
+
+	// A square with flowers: the hoe still tills it (and clears the blooms).
+	const flowers = { column: 11, row: 3 };
+	await hoverFarmTile(page, flowers.column, flowers.row);
+	await expect(page.getByTestId("farm-tile")).toContainText(
+		`(${flowers.column}, ${flowers.row}):`,
+	);
+	await clickFarmTile(page, flowers.column, flowers.row);
+	await expect(page.getByTestId("farm-tile")).toContainText(
+		`(${flowers.column}, ${flowers.row}): tilled`,
+	);
+	await expect(tiles).toHaveText("2 tiles");
 });
 
 test("the hoe refuses fence tiles", async ({ page }) => {
@@ -97,7 +113,7 @@ test("the hoe refuses fence tiles", async ({ page }) => {
 	await expect(page).toHaveURL(/\/world$/);
 	await expect(page.getByTestId("notification-feed")).toBeVisible();
 
-	await clickTile(page, 7, 5);
+	await clickFarmTile(page, 7, 5);
 	await expect(page.getByTestId("notification-feed")).toContainText(
 		"Something is in the way.",
 	);
@@ -109,7 +125,7 @@ test("the hoe refuses tiles behind buildings", async ({ page }) => {
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 
-	await clickTile(page, 3, 2);
+	await clickFarmTile(page, 3, 2);
 	await expect(page.getByTestId("notification-feed")).toContainText(
 		"Something is in the way.",
 	);
@@ -121,7 +137,7 @@ test("tilling under flowers clears them", async ({ page }) => {
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 
-	await clickTile(page, 11, 3);
+	await clickFarmTile(page, 11, 3);
 	await expect(page.getByTestId("farm-tile")).toContainText("(11, 3): tilled");
 });
 
@@ -177,15 +193,15 @@ test("tilled soil renders as brown dirt, not grass", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Soil"));
 
-	const grass = await tilePixel(page, 9, 7);
+	const grass = await farmTilePixel(page, 9, 7);
 	// Grass is green-dominant.
 	expect(grass.g).toBeGreaterThan(grass.r);
 
-	await clickTile(page, 9, 7);
+	await clickFarmTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
 
 	// Tilled-dry soil is brown: red dominant over green and blue.
-	const soil = await tilePixel(page, 9, 7);
+	const soil = await farmTilePixel(page, 9, 7);
 	expect(soil.r).toBeGreaterThan(soil.g + 20);
 	expect(soil.r).toBeGreaterThan(soil.b + 20);
 });

@@ -21,6 +21,22 @@ if ! grep -q '^DATABASE_PATH=.' "$ENV_FILE"; then
   printf 'DATABASE_PATH=%s\n' "$DATA_DIR/grange.sqlite3" >> "$ENV_FILE"
 fi
 
+# One-time migration: previous releases kept the database inside the release
+# directory (<release>/data/grange.sqlite3). If the new location is still empty
+# but the legacy file exists, carry it over so existing data survives the move.
+TARGET_DB="$(grep '^DATABASE_PATH=' "$ENV_FILE" | tail -n 1 | cut -d= -f2-)"
+RELEASE_DIR="$(cd "$(dirname "$0")" && pwd)"
+LEGACY_DB="$RELEASE_DIR/data/grange.sqlite3"
+mkdir -p "$(dirname "$TARGET_DB")"
+if [ ! -s "$TARGET_DB" ] && [ -s "$LEGACY_DB" ]; then
+  cp -n "$LEGACY_DB" "$TARGET_DB"
+  for suffix in -wal -shm; do
+    if [ -s "$LEGACY_DB$suffix" ]; then
+      cp -n "$LEGACY_DB$suffix" "$TARGET_DB$suffix"
+    fi
+  done
+fi
+
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
 systemctl --user restart grange
