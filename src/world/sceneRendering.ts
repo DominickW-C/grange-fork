@@ -42,12 +42,16 @@ export function addTerrain(
 	scene.add(terrain);
 }
 
+/** Props the scene animates itself (the train), so prop rendering skips them. */
+const ANIMATED_PROPS = new Set<string>(["starter-train"]);
+
 export function addProps<Asset extends string>(
 	scene: ex.Scene,
 	props: RenderedProp<Asset>[],
 	images: Record<Asset, ex.ImageSource>,
 ): void {
 	for (const prop of props) {
+		if (ANIMATED_PROPS.has(prop.asset)) continue;
 		const source = images[prop.asset];
 		const sprite = source.toSprite();
 		const scale = prop.width / source.width;

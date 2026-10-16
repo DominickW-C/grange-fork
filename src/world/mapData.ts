@@ -85,6 +85,9 @@ export function worldToFieldTile(
 export const FARM_PLAYER_SPAWN = { x: 576, y: 620 } as const;
 export const FARM_TRAIN_STOP = { x: 810, y: 600 } as const;
 export const FARM_TRAIN_ENGINE_STOP = { x: 1070, y: 600 } as const;
+/** Where the player steps off when arriving at the farm by train: just above
+ * the parked train so they rise out from behind it. */
+export const FARM_TRAIN_ARRIVAL_SPAWN = { x: 960, y: 530 } as const;
 
 /** The cart and engine share one continuous boarding area. */
 export function isNearFarmTrain(x: number, y: number): boolean {

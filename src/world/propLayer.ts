@@ -4,8 +4,12 @@ import {
 	groundFootprintTiles,
 	rectFootprintTiles,
 } from "./blocking";
-import { propBlocking, props } from "./mapData";
+import { type PropKey, propBlocking, props } from "./mapData";
 import { propImages } from "./resources";
+
+/** Props the scene animates itself (the train), so the layer skips drawing
+ * them — but still registers the tiles they block. */
+const ANIMATED_PROPS = new Set<PropKey>(["starter-train"]);
 
 /**
  * Adds every farm prop to the scene and registers the tiles it blocks. Fences
@@ -19,18 +23,7 @@ export function addFarmProps(
 ): void {
 	props.forEach((prop, index) => {
 		const source = propImages[prop.asset];
-		const sprite = source.toSprite();
 		const scale = prop.width / source.width;
-		sprite.scale = ex.vec(scale, scale);
-
-		const actor = new ex.Actor({
-			pos: ex.vec(prop.x, prop.y),
-			anchor: ex.vec(0.5, 1),
-			z: 100 + Math.floor(prop.y),
-		});
-		actor.graphics.use(sprite);
-		scene.add(actor);
-		propActors[index] = actor;
 
 		const rule = propBlocking[prop.asset];
 		if (rule === "rect") {
@@ -44,5 +37,18 @@ export function addFarmProps(
 				groundFootprintTiles(prop.x, prop.y, prop.width),
 			);
 		}
+
+		if (ANIMATED_PROPS.has(prop.asset)) return;
+
+		const sprite = source.toSprite();
+		sprite.scale = ex.vec(scale, scale);
+		const actor = new ex.Actor({
+			pos: ex.vec(prop.x, prop.y),
+			anchor: ex.vec(0.5, 1),
+			z: 100 + Math.floor(prop.y),
+		});
+		actor.graphics.use(sprite);
+		scene.add(actor);
+		propActors[index] = actor;
 	});
 }

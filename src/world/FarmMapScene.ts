@@ -30,9 +30,10 @@ import { updateFarmPlayer } from "./playerMovement";
 import { addFarmProps } from "./propLayer";
 import { terrainFrames, terrainImage } from "./resources";
 import { clearDecorAt, refreshTile } from "./tileSync";
-import type { WorldArea } from "./WalkingScene";
+import { findTrainRest, TrainController } from "./train";
+import type { SceneActivationData, WorldArea } from "./WalkingScene";
 
-export class FarmMapScene extends ex.Scene {
+export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	onFarmUpdate: ((snapshot: FarmHudSnapshot) => void) | null = null;
 
 	private inputManager!: InputManager;
@@ -58,6 +59,7 @@ export class FarmMapScene extends ex.Scene {
 	private deactivated = false;
 	private lastTomatoes = -1;
 	private readonly travel: FarmTravel;
+	private train!: TrainController;
 
 	constructor(
 		private readonly owner: string,
@@ -108,6 +110,9 @@ export class FarmMapScene extends ex.Scene {
 		// 3. Populate Props and register their tool-blocked tiles
 		addFarmProps(this, this.blocks, this.propActors);
 
+		// The train is animated separately from the static prop layer.
+		this.train = new TrainController(findTrainRest(props), this);
+
 		// 4. Create Player Actor
 		this.player = new ex.Actor({
 			pos: ex.vec(FARM_PLAYER_SPAWN.x, FARM_PLAYER_SPAWN.y),
@@ -149,15 +154,22 @@ export class FarmMapScene extends ex.Scene {
 		this.emitHud();
 	}
 
-	override onActivate(): void {
+	override onActivate(
+		context: ex.SceneActivationContext<SceneActivationData>,
+	): void {
 		if (this.deactivated) this.inputManager = new InputManager();
 		this.deactivated = false;
 		this.travel.activate();
+		this.train.reset(context.data?.trainArriving ?? false);
 	}
 
 	override onPreUpdate(engine: ex.Engine, delta: number): void {
-		// Freeze movement while the inventory modal captures input.
-		if (isInventoryBlockingInput()) {
+		this.train.update(delta);
+		this.player.graphics.visible = this.train.isParked();
+
+		// Freeze and hide the player while the inventory modal captures input,
+		// or while the train carries them in or out.
+		if (isInventoryBlockingInput() || !this.train.isParked()) {
 			this.player.vel = ex.vec(0, 0);
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
 			return;
@@ -169,7 +181,7 @@ export class FarmMapScene extends ex.Scene {
 		updateFarmPlayer(this.player, dir, delta);
 		updateFarmerGraphics(this.player, dir);
 
-		this.travel.update(this.player, this.inputManager, engine);
+		this.travel.update(this.player, this.inputManager, engine, this.train);
 
 		this.handleToolKeys();
 		this.syncTilesFromServer();

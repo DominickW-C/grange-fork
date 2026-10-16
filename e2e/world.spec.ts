@@ -4,6 +4,7 @@ import {
 	register,
 	resetServer,
 	uniqueName,
+	waitForTrainStop,
 	walkUntilPrompt,
 } from "./helpers";
 
@@ -71,15 +72,9 @@ test("the marketplace casino opens and returns outside", async ({ page }) => {
 	await expect(prompt).toContainText("travel to the marketplace");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+	await waitForTrainStop(page);
 
-	await page.keyboard.down("w");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(2_900);
-	await page.keyboard.up("w");
-	await page.keyboard.up("d");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(1_200);
-	await page.keyboard.up("d");
+	await walkUntilPrompt(page, ["w"], "enter the casino");
 
 	await expect(prompt).toContainText("enter the casino");
 	await page.keyboard.press("e");
@@ -103,12 +98,12 @@ test("the seed market opens a window with a seeds tab", async ({ page }) => {
 	await expect(prompt).toContainText("travel to the marketplace");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+	await waitForTrainStop(page);
 
-	await page.keyboard.down("w");
 	await page.keyboard.down("a");
-	await page.waitForTimeout(2_800);
-	await page.keyboard.up("w");
+	await page.waitForTimeout(2_000);
 	await page.keyboard.up("a");
+	await walkUntilPrompt(page, ["w", "a"], "enter the seed market");
 
 	await expect(prompt).toContainText("enter the seed market");
 	await page.keyboard.press("e");
@@ -151,13 +146,9 @@ test("the produce market opens sell, tools, and train tabs", async ({
 		"aria-label",
 		/^Marketplace map/,
 	);
+	await waitForTrainStop(page);
 
-	await page.keyboard.down("w");
-	await page.waitForTimeout(2_000);
-	await page.keyboard.up("w");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(1_000);
-	await page.keyboard.up("d");
+	await walkUntilPrompt(page, ["w", "a"], "enter the produce market");
 
 	await expect(prompt).toContainText("enter the produce market");
 	await page.keyboard.press("e");
@@ -240,12 +231,8 @@ test("selling a chosen number of tomatoes uses the quantity stepper", async ({
 		"aria-label",
 		/^Marketplace map/,
 	);
-	await page.keyboard.down("w");
-	await page.waitForTimeout(2_000);
-	await page.keyboard.up("w");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(1_000);
-	await page.keyboard.up("d");
+	await waitForTrainStop(page);
+	await walkUntilPrompt(page, ["w", "a"], "enter the produce market");
 	await page.keyboard.press("e");
 
 	const market = page.getByTestId("market-window");
@@ -308,16 +295,10 @@ test("the blackjack table opens a playable sub-screen", async ({ page }) => {
 	await expect(prompt).toContainText("travel to the marketplace");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+	await waitForTrainStop(page);
 
 	// Marketplace -> casino.
-	await page.keyboard.down("w");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(2_900);
-	await page.keyboard.up("w");
-	await page.keyboard.up("d");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(1_200);
-	await page.keyboard.up("d");
+	await walkUntilPrompt(page, ["w"], "enter the casino");
 	await expect(prompt).toContainText("enter the casino");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);

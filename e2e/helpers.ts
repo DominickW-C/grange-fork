@@ -111,6 +111,14 @@ export async function walkUntilPrompt(
 	}
 }
 
+/** Waits for the arriving train to park so the player can move again. The
+ * marketplace spawn sits beside the train, so its prompt appears once idle. */
+export async function waitForTrainStop(page: Page): Promise<void> {
+	await expect(page.getByTestId("travel-prompt")).toContainText(
+		"return to the farm",
+	);
+}
+
 /** Walks from the farm spawn through the marketplace and into the casino. */
 export async function walkToCasino(page: Page): Promise<void> {
 	const canvas = page.locator("canvas");
@@ -122,16 +130,9 @@ export async function walkToCasino(page: Page): Promise<void> {
 	await expect(prompt).toContainText("travel to the marketplace");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+	await waitForTrainStop(page);
 
-	await page.keyboard.down("w");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(2_900);
-	await page.keyboard.up("w");
-	await page.keyboard.up("d");
-	await page.keyboard.down("d");
-	await page.waitForTimeout(1_200);
-	await page.keyboard.up("d");
-	await expect(prompt).toContainText("enter the casino");
+	await walkUntilPrompt(page, ["w"], "enter the casino");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
 }
