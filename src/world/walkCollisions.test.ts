@@ -9,7 +9,9 @@ import {
 	FARM_TRAIN_ARRIVAL_SPAWN,
 	FARM_TRAIN_STOP,
 	isNearFarmTrain,
+	props,
 } from "./mapData";
+import { placedFarmProps } from "./farmPropData";
 import {
 	MARKETPLACE_CASINO_ENTRANCE,
 	MARKETPLACE_PLAYER_SPAWN,
@@ -20,6 +22,7 @@ import {
 	casinoWalkObstacles,
 	farmWalkObstacles,
 	marketplaceWalkObstacles,
+	setFarmPropObstacles,
 } from "./sceneObstacles";
 import { moveAroundObstacles, type WalkObstacle } from "./walkCollisions";
 
@@ -69,6 +72,25 @@ describe("walking collisions", () => {
 			x: 150,
 			y: 88,
 		});
+	});
+
+	it("updates walking collision when the well is carried and placed elsewhere", () => {
+		const atWell = (box: WalkObstacle) => box.left <= 200 && box.right >= 200 &&
+			box.top <= 370 && box.bottom >= 370;
+		expect(farmWalkObstacles.some(atWell)).toBe(true);
+		try {
+			setFarmPropObstacles(placedFarmProps([
+				{ index: 2, asset: "well", x: 0, y: 0, carried: true },
+			]));
+			expect(farmWalkObstacles.some(atWell)).toBe(false);
+			setFarmPropObstacles(placedFarmProps([
+				{ index: 2, asset: "well", x: 480, y: 416, carried: false },
+			]));
+			expect(farmWalkObstacles.some((box) => box.left <= 480 && box.right >= 480 &&
+				box.top <= 390 && box.bottom >= 390)).toBe(true);
+		} finally {
+			setFarmPropObstacles(props);
+		}
 	});
 
 	it("leaves scene spawns clear and train prompts reachable", () => {
