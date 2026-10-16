@@ -5,6 +5,7 @@ import {
 	resetServer,
 	uniqueName,
 	waitForTrainStop,
+	walkToSeedMarket,
 	walkUntilPrompt,
 } from "./helpers";
 
@@ -100,10 +101,7 @@ test("the seed market opens a window with a seeds tab", async ({ page }) => {
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
 	await waitForTrainStop(page);
 
-	await page.keyboard.down("a");
-	await page.waitForTimeout(2_000);
-	await page.keyboard.up("a");
-	await walkUntilPrompt(page, ["w", "a"], "enter the seed market");
+	await walkToSeedMarket(page);
 
 	await expect(prompt).toContainText("enter the seed market");
 	await page.keyboard.press("e");

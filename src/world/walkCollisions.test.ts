@@ -16,6 +16,7 @@ import {
 	MARKETPLACE_CASINO_ENTRANCE,
 	MARKETPLACE_PLAYER_SPAWN,
 	MARKETPLACE_PRODUCE_MARKET_ENTRANCE,
+	MARKETPLACE_SEED_MARKET_ENTRANCE,
 	MARKETPLACE_TRAIN_STOP,
 } from "./marketplaceData";
 import {
@@ -204,6 +205,25 @@ describe("walking collisions", () => {
 			Math.hypot(
 				produce.x - MARKETPLACE_PRODUCE_MARKET_ENTRANCE.x,
 				produce.y - MARKETPLACE_PRODUCE_MARKET_ENTRANCE.y,
+			),
+		).toBeLessThan(95);
+	});
+
+	it("keeps the seed market reachable from the new train-side spawn", () => {
+		// Mirrors e2e/helpers walkToSeedMarket: north into the clear lane
+		// between the shop fronts and the stall tops, then straight west.
+		const seed = walk(
+			MARKETPLACE_PLAYER_SPAWN,
+			[
+				{ x: 0, y: -1, seconds: 1.3 },
+				{ x: -1, y: 0, seconds: 4.5 },
+			],
+			marketplaceWalkObstacles,
+		);
+		expect(
+			Math.hypot(
+				seed.x - MARKETPLACE_SEED_MARKET_ENTRANCE.x,
+				seed.y - MARKETPLACE_SEED_MARKET_ENTRANCE.y,
 			),
 		).toBeLessThan(95);
 	});

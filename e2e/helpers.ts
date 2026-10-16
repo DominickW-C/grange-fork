@@ -119,6 +119,24 @@ export async function waitForTrainStop(page: Page): Promise<void> {
 	);
 }
 
+/**
+ * Walks from the marketplace spawn to the seed market door. Heads north first
+ * into the clear lane between the shop fronts (bottom y=300) and the stall
+ * tops (y~450), then walks straight west until the seed prompt shows. A
+ * straight-west walk avoids wedging diagonally into the produce-cart/barrel
+ * row and ends stopped inside the prompt radius instead of streaking through
+ * it on a diagonal.
+ */
+export async function walkToSeedMarket(
+	page: Page,
+	timeout = 20_000,
+): Promise<void> {
+	await page.keyboard.down("w");
+	await page.waitForTimeout(1_300);
+	await page.keyboard.up("w");
+	await walkUntilPrompt(page, ["a"], "enter the seed market", timeout);
+}
+
 /** Walks from the farm spawn through the marketplace and into the casino. */
 export async function walkToCasino(page: Page): Promise<void> {
 	const canvas = page.locator("canvas");
