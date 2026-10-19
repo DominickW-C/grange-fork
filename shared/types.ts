@@ -1,4 +1,9 @@
-import type { FarmTileState } from "./farm";
+import type {
+	ActiveEffect,
+	CropId,
+	FarmInventory,
+	FarmTileState,
+} from "./farm";
 
 /** A registered account as sent over the wire (no password hash). */
 export interface Player {
@@ -10,16 +15,28 @@ export interface FarmTile {
 	x: number;
 	y: number;
 	state: FarmTileState;
+	cropId: CropId;
 }
 
-/** The full field and barn inventory for one farm. */
+/** The full field, barn, brewery, and movable props for one farm. */
 export interface ActiveFarm {
 	owner: string;
 	tiles: FarmTile[];
 	tomatoes: number;
+	inventory: FarmInventory;
+	brewery: {
+		built: boolean;
+		effects: ActiveEffect[];
+	};
 	fences: Array<{ x: number; y: number }>;
 	fence_count: number;
-	prop_overrides: Array<{ index: number; asset: string; x: number; y: number; carried: boolean }>;
+	prop_overrides: Array<{
+		index: number;
+		asset: string;
+		x: number;
+		y: number;
+		carried: boolean;
+	}>;
 	prop_inventory: Record<string, number>;
 }
 
@@ -42,6 +59,7 @@ export type FarmAction = {
 	kind: "till" | "plant" | "water" | "harvest" | "place_fence" | "remove_fence";
 	x: number;
 	y: number;
+	crop?: CropId;
 };
 
 export interface ServerState {

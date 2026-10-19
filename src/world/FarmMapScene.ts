@@ -1,6 +1,8 @@
 import * as ex from "excalibur";
+import { moveSpeedMultiplier } from "../../shared/brewing";
 import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
+import type { FarmAction } from "../../shared/types";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
 import { isInventoryBlockingInput } from "../inventory/inventoryStore";
@@ -179,7 +181,9 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
-		updateFarmPlayer(this.player, dir, delta);
+		// Swift Sip speeds the farmer up while it lasts.
+		const effects = useGameStore.getState().activeFarm?.brewery.effects ?? [];
+		updateFarmPlayer(this.player, dir, delta, moveSpeedMultiplier(effects, Date.now()));
 		updateFarmerGraphics(this.player, dir);
 
 		this.travel.update(this.player, this.inputManager, engine, this.train);
@@ -262,11 +266,9 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		if (tool === "seed" && !consumeSeedAt(column, row,
 			(message) => { this.message = message; this.emitHud(); })) return;
 
-		emitFarmAction(this.owner, {
-			kind: TOOL_KIND[tool],
-			x: column,
-			y: row,
-		});
+		const action: FarmAction = { kind: TOOL_KIND[tool], x: column, y: row };
+		if (action.kind === "plant") action.crop = useGameStore.getState().crop;
+		emitFarmAction(this.owner, action);
 	}
 
 	/** Reconciles server tiles into terrain + crop visuals. Server tiles use

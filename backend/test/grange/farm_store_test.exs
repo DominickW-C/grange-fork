@@ -2,7 +2,7 @@ defmodule Grange.FarmStoreTest do
   @moduledoc false
   use ExUnit.Case, async: false
 
-  alias Grange.{Farm, FarmStore}
+  alias Grange.{Crops, Farm, FarmStore}
 
   setup do
     FarmStore.reset()
@@ -255,5 +255,37 @@ defmodule Grange.FarmStoreTest do
 
     assert_receive %Phoenix.Socket.Broadcast{event: "farms"}
     refute_receive %Phoenix.Socket.Broadcast{event: "farms"}, 50
+  end
+
+  test "planting a named crop records it and harvest adds that crop" do
+    FarmStore.ensure("Alice")
+    FarmStore.action("Alice", %{"kind" => "till", "x" => 2, "y" => 2})
+    FarmStore.action("Alice", %{"kind" => "plant", "x" => 2, "y" => 2, "crop" => "wheat"})
+
+    assert %{crop: "wheat", cropId: "wheat"} = tile_at("Alice", 2, 2)
+
+    FarmStore.action("Alice", %{"kind" => "water", "x" => 2, "y" => 2})
+    FarmStore.tick(System.system_time(:millisecond) + 60_000)
+
+    assert {:ok, view} = FarmStore.action("Alice", %{"kind" => "harvest", "x" => 2, "y" => 2})
+    assert view.inventory["wheat"] == Crops.yield_of("wheat")
+    assert view.tomatoes == 0
+  end
+
+  test "planting an unknown crop is rejected" do
+    FarmStore.ensure("Alice")
+
+    assert {:error, "invalid action"} =
+             FarmStore.action("Alice", %{"kind" => "plant", "x" => 0, "y" => 0, "crop" => "corn"})
+  end
+
+  test "watering uses the planted crop's grow time" do
+    FarmStore.ensure("Alice")
+    FarmStore.action("Alice", %{"kind" => "till", "x" => 3, "y" => 3})
+    FarmStore.action("Alice", %{"kind" => "plant", "x" => 3, "y" => 3, "crop" => "barley"})
+    FarmStore.action("Alice", %{"kind" => "water", "x" => 3, "y" => 3})
+
+    tile = tile_at("Alice", 3, 3)
+    assert tile.ready_at - tile.watered_at == Crops.grow_ms("barley")
   end
 end

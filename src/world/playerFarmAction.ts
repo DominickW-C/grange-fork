@@ -1,4 +1,5 @@
 import { isFarmInBounds } from "../../shared/farm";
+import type { FarmAction } from "../../shared/types";
 import { countItem, useInventoryStore } from "../inventory/inventoryStore";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
@@ -15,7 +16,9 @@ export function actOnPlayerFarmTile(owner: string, x: number, y: number,
 	if (!isFarmInBounds(column, row)) return;
 	const tool = useGameStore.getState().tool;
 	if (tool === "seed" && !consumeSeedAt(column, row, report)) return;
-	emitFarmAction(owner, { kind: TOOL_KIND[tool], x: column, y: row });
+	const action: FarmAction = { kind: TOOL_KIND[tool], x: column, y: row };
+	if (action.kind === "plant") action.crop = useGameStore.getState().crop;
+	emitFarmAction(owner, action);
 }
 
 /** Keep click-to-plant and Space-to-plant on the same seed-consumption rule. */
