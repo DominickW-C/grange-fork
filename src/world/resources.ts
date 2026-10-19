@@ -1,7 +1,8 @@
 import * as ex from "excalibur";
+import { CROPS, type CropId } from "../../shared/crops";
 import { fenceResources } from "./fenceResources";
-import type { PropKey, TerrainKey } from "./mapData";
 import { farmerImage } from "./farmerSprite";
+import type { PropKey, TerrainKey } from "./mapData";
 
 export const image = (path: string) =>
 	new ex.ImageSource(`/assets/${path}`, {
@@ -24,13 +25,33 @@ export const smokeMedImage = image("transport/smokeMed.png");
 export const smokeBigImage = image("transport/smokeBig.png");
 export const smokeImages = [smokeSmallImage, smokeMedImage, smokeBigImage];
 
-export const sproutImage = image("farm/plants/sprout.webp");
-export const tomatoPlantImage = image("farm/plants/tomato-plant.webp");
+/** One image per growth stage of every registered crop. */
+export const cropStageImages: Record<CropId, ex.ImageSource[]> = Object.fromEntries(
+	(Object.keys(CROPS) as CropId[]).map((id) => [
+		id,
+		CROPS[id].stages.map((file) => image(`crops/${file}`)),
+	]),
+) as Record<CropId, ex.ImageSource[]>;
 
-export const cropImages = {
-	sprout: sproutImage,
-	"tomato-plant": tomatoPlantImage,
+/** Harvested-produce icon per crop, used by the inventory and hotbar. */
+export const cropHarvestedImages: Record<CropId, ex.ImageSource> = Object.fromEntries(
+	(Object.keys(CROPS) as CropId[]).map((id) => [
+		id,
+		image(`crops/${CROPS[id].harvested}`),
+	]),
+) as Record<CropId, ex.ImageSource>;
+
+export const scytheImages = {
+	basic: image("tools/scythe_basic.webp"),
+	iron: image("tools/scythe_iron.webp"),
+	runed: image("tools/scythe_runed.webp"),
 };
+
+export const sweepFxImages = [
+	image("tools/sweep_fx_0.webp"),
+	image("tools/sweep_fx_1.webp"),
+	image("tools/sweep_fx_2.webp"),
+];
 
 export const propImages: Record<PropKey, ex.ImageSource> = {
 	farmhouse: image("farm/buildings/farmhouse.webp"),
@@ -57,7 +78,10 @@ export const resources = [
 	...trainFrameImages,
 	...smokeImages,
 	...Object.values(propImages),
-	...Object.values(cropImages),
+	...Object.values(cropStageImages).flat(),
+	...Object.values(cropHarvestedImages),
+	...Object.values(scytheImages),
+	...sweepFxImages,
 ];
 
 export const terrainFrames: Record<
