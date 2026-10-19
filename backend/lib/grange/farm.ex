@@ -54,29 +54,18 @@ defmodule Grange.Farm do
     |> Map.merge(%{planted_at: nil, watered_at: nil, ready_at: nil})
   end
 
-  @doc "Plants a seed in a tilled tile, defaulting to tomato."
+  @doc "Plants a seed in a tilled tile."
   @spec plant(tile(), integer()) :: {:ok, tile()} | {:error, String.t()}
-  def plant(tile, now), do: plant(tile, now, "tomato")
+  def plant(%{state: :tilled} = tile, now), do: {:ok, %{tile | state: :planted, planted_at: now}}
+  def plant(_tile, _now), do: {:error, "tile is not tilled"}
 
-  @doc "Plants `crop` in a tilled tile."
-  @spec plant(tile(), integer(), String.t()) :: {:ok, tile()} | {:error, String.t()}
-  def plant(%{state: :tilled} = tile, now, crop) when is_binary(crop) do
-    {:ok, %{tile | state: :planted, planted_at: now, crop: crop}}
-  end
-
-  def plant(_tile, _now, _crop), do: {:error, "tile is not tilled"}
-
-  @doc "Waters a planted tile, scheduling readiness after the default grow time."
+  @doc "Waters a planted tile, scheduling when it becomes ready."
   @spec water(tile(), integer()) :: {:ok, tile()} | {:error, String.t()}
-  def water(tile, now), do: water(tile, now, @grow_ms)
-
-  @doc "Waters a planted tile, scheduling readiness after `grow_ms`."
-  @spec water(tile(), integer(), pos_integer()) :: {:ok, tile()} | {:error, String.t()}
-  def water(%{state: :planted} = tile, now, grow_ms) when is_integer(grow_ms) and grow_ms > 0 do
-    {:ok, %{tile | state: :watered, watered_at: now, ready_at: now + grow_ms}}
+  def water(%{state: :planted} = tile, now) do
+    {:ok, %{tile | state: :watered, watered_at: now, ready_at: now + @grow_ms}}
   end
 
-  def water(_tile, _now, _grow_ms), do: {:error, "tile is not planted"}
+  def water(_tile, _now), do: {:error, "tile is not planted"}
 
   @doc "Harvests a ready tile back to tilled ground."
   @spec harvest(tile()) :: {:ok, tile()} | {:error, String.t()}

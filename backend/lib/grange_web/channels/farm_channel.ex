@@ -4,12 +4,11 @@ defmodule GrangeWeb.FarmChannel do
 
   Replaces the socket.io `visitFarm` / `leaveFarm` / `farmAction` events and
   the `farmUpdate` broadcast. Identity comes from the session, never the client.
-  Market, brewery, bar, and prop actions share the same owner-only boundary.
   """
 
   use Phoenix.Channel
 
-  alias Grange.{BreweryStore, FarmStore}
+  alias Grange.FarmStore
 
   @impl true
   def join("farm:" <> owner, _payload, socket) do
@@ -31,57 +30,18 @@ defmodule GrangeWeb.FarmChannel do
   end
 
   @impl true
-  def handle_in("farmAction", payload, socket) do
-    authorize(socket, &act(socket, &1, field(payload, "action")))
+  def handle_in("farmAction", %{"action" => action}, socket) do
+    authorize(socket, fn owner -> act(socket, owner, action) end)
   end
 
-  def handle_in("farmPropAction", payload, socket) do
-    authorize(socket, &prop_act(socket, &1, field(payload, "action")))
+  @impl true
+  def handle_in("farmPropAction", %{"action" => action}, socket) do
+    authorize(socket, fn owner -> prop_act(socket, owner, action) end)
   end
 
-  def handle_in("sellTomatoes", payload, socket) do
-    authorize(socket, &sell(socket, &1, field(payload, "count")))
-  end
-
-  def handle_in("buySeed", payload, socket) do
-    authorize(
-      socket,
-      &respond(socket, BreweryStore.buy_seed(&1, field(payload, "crop"), quantity(payload)))
-    )
-  end
-
-  def handle_in("buyMaterial", payload, socket) do
-    authorize(
-      socket,
-      &respond(
-        socket,
-        BreweryStore.buy_material(&1, field(payload, "material"), quantity(payload))
-      )
-    )
-  end
-
-  def handle_in("buildBrewery", _payload, socket) do
-    authorize(socket, &respond(socket, BreweryStore.build_brewery(&1)))
-  end
-
-  def handle_in("brew", payload, socket) do
-    authorize(socket, &respond(socket, BreweryStore.brew(&1, field(payload, "potion"))))
-  end
-
-  def handle_in("sellPotion", payload, socket) do
-    authorize(socket, &respond(socket, BreweryStore.sell_potion(&1, field(payload, "potion"))))
-  end
-
-  def handle_in("sellCrop", payload, socket) do
-    authorize(socket, &respond(socket, BreweryStore.sell_crop(&1, field(payload, "crop"))))
-  end
-
-  def handle_in("usePotion", payload, socket) do
-    authorize(socket, &respond(socket, BreweryStore.use_potion(&1, field(payload, "potion"))))
-  end
-
-  def handle_in(_event, _payload, socket) do
-    {:reply, {:error, %{error: "unknown event"}}, socket}
+  @impl true
+  def handle_in("sellTomatoes", %{"count" => count}, socket) do
+    authorize(socket, fn owner -> sell(socket, owner, count) end)
   end
 
   @impl true
@@ -101,18 +61,24 @@ defmodule GrangeWeb.FarmChannel do
     end
   end
 
-  defp act(socket, owner, action), do: respond(socket, FarmStore.action(owner, action))
+  defp act(socket, owner, action) do
+    case FarmStore.action(owner, action) do
+      {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
 
-  defp prop_act(socket, owner, action), do: respond(socket, FarmStore.prop_action(owner, action))
+  defp prop_act(socket, owner, action) do
+    case FarmStore.prop_action(owner, action) do
+      {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
 
-  defp sell(socket, owner, count), do: respond(socket, FarmStore.sell_tomatoes(owner, count))
-
-  defp respond(socket, {:ok, _farm}), do: {:reply, :ok, socket}
-  defp respond(socket, {:error, reason}), do: {:reply, {:error, %{error: reason}}, socket}
-
-  defp field(payload, key) when is_map(payload), do: Map.get(payload, key)
-  defp field(_payload, _key), do: nil
-
-  defp quantity(payload) when is_map(payload), do: Map.get(payload, "quantity", 1)
-  defp quantity(_payload), do: 1
+  defp sell(socket, owner, count) do
+    case FarmStore.sell_tomatoes(owner, count) do
+      {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
 end

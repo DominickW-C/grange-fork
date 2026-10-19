@@ -18,8 +18,6 @@ import { BlackjackOverlay } from "./BlackjackOverlay";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
 import { FarmMapScene } from "./FarmMapScene";
-import FarmShop from "./FarmShop";
-import { useFarmItemNotice } from "./farmItemNotice";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
 import { MarketplaceScene } from "./MarketplaceScene";
@@ -113,7 +111,12 @@ export default function FarmMap() {
 	}, [hotbar, selectedHotbar, setTool]);
 
 	const heldItem = hotbar[selectedHotbar]?.itemId;
-	useFarmItemNotice(heldItem, pushNotice);
+	useEffect(() => {
+		if (heldItem === "fence") pushNotice("Fence: click clear grass to place a post.", "system");
+		if (heldItem === "shovel") pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
+		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
+			pushNotice(`Click clear ground to place ${heldItem}.`, "system");
+	}, [heldItem, pushNotice]);
 
 	const fenceCount = farm?.fence_count;
 	useEffect(() => {
@@ -326,7 +329,6 @@ export default function FarmMap() {
 			)}
 			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
 			<InventoryPanel />
-			<FarmShop />
 			{paused && <PauseMenu />}
 			{blackjackOpen && <BlackjackOverlay onClose={closeCasinoOverlay} />}
 			{pokerOpen && <PokerOverlay onClose={closeCasinoOverlay} />}

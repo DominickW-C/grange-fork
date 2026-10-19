@@ -1,12 +1,5 @@
 import { type Channel, Socket } from "phoenix";
-import type { CropId, MaterialId, PotionId } from "../shared/farm";
-import type {
-	ActiveFarm,
-	FarmAction,
-	FarmPropAction,
-	FarmSummary,
-	Player,
-} from "../shared/types";
+import type { ActiveFarm, FarmAction, FarmPropAction, FarmSummary, Player } from "../shared/types";
 import { useGameStore } from "./store";
 
 /** Session token used to authenticate the socket handshake. */
@@ -135,12 +128,9 @@ export function emitLeaveFarm(cb?: (res: Ack) => void): void {
 	cb?.({ ok: true });
 }
 
-/** Pushes one owner-only farm event and normalizes the reply. */
-function pushFarm(
+export function emitFarmAction(
 	owner: string,
-	event: string,
-	payload: Record<string, unknown>,
-	fallback: string,
+	action: FarmAction,
 	cb?: (res: Ack) => void,
 ): void {
 	const channel = farmChannel;
@@ -150,28 +140,26 @@ function pushFarm(
 	}
 
 	channel
-		.push(event, payload)
+		.push("farmAction", { action })
 		.receive("ok", () => cb?.({ ok: true }))
-		.receive("error", (response: unknown) =>
-			cb?.({ ok: false, error: reasonOf(response) ?? fallback }),
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Invalid action" }),
 		)
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
-export function emitFarmAction(
-	owner: string,
-	action: FarmAction,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "farmAction", { action }, "Invalid action", cb);
-}
-
-export function emitFarmPropAction(
-	owner: string,
-	action: FarmPropAction,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "farmPropAction", { action }, "Invalid object action", cb);
+export function emitFarmPropAction(owner: string, action: FarmPropAction,
+	cb?: (res: Ack) => void): void {
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
+		return;
+	}
+	channel.push("farmPropAction", { action })
+		.receive("ok", () => cb?.({ ok: true }))
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Invalid object action" }))
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
 /** Sells tomatoes from the visited farm's barn back to the market. */
@@ -180,61 +168,19 @@ export function emitSellTomatoes(
 	count: number,
 	cb?: (res: Ack) => void,
 ): void {
-	pushFarm(owner, "sellTomatoes", { count }, "Could not sell", cb);
-}
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
+		return;
+	}
 
-export function emitBuySeed(
-	owner: string,
-	crop: CropId,
-	quantity = 1,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "buySeed", { crop, quantity }, "Could not buy seeds", cb);
-}
-
-export function emitBuyMaterial(
-	owner: string,
-	material: MaterialId,
-	quantity = 1,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "buyMaterial", { material, quantity }, "Could not buy material", cb);
-}
-
-export function emitBuildBrewery(owner: string, cb?: (res: Ack) => void): void {
-	pushFarm(owner, "buildBrewery", {}, "Could not build the brewery", cb);
-}
-
-export function emitBrew(
-	owner: string,
-	potion: PotionId,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "brew", { potion }, "Could not brew", cb);
-}
-
-export function emitSellPotion(
-	owner: string,
-	potion: PotionId,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "sellPotion", { potion }, "Could not sell the potion", cb);
-}
-
-export function emitSellCrop(
-	owner: string,
-	crop: CropId,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "sellCrop", { crop }, "Could not sell the crop", cb);
-}
-
-export function emitUsePotion(
-	owner: string,
-	potion: PotionId,
-	cb?: (res: Ack) => void,
-): void {
-	pushFarm(owner, "usePotion", { potion }, "Could not drink the potion", cb);
+	channel
+		.push("sellTomatoes", { count })
+		.receive("ok", () => cb?.({ ok: true }))
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not sell" }),
+		)
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
 /** Registers global handlers and opens the lobby channel. */
