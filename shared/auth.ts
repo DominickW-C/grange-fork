@@ -5,6 +5,8 @@ export interface User {
 	passwordHash: string;
 	createdAt: string;
 	balance: number;
+	/** Admins get every item and effectively unlimited money. Dev-only flag. */
+	is_admin: boolean;
 }
 
 export type AuthUser = Omit<User, "passwordHash">;
