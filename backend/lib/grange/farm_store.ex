@@ -22,6 +22,8 @@ defmodule Grange.FarmStore do
     FarmAction,
     FarmFence,
     FarmFences,
+    FarmGate,
+    FarmGates,
     FarmProp,
     FarmProps,
     FarmRecord,
@@ -66,6 +68,8 @@ defmodule Grange.FarmStore do
           tomatoes: Map.get(barn, "tomato", 0),
           fences: FarmFences.list(owner),
           fence_count: farm.fence_count,
+          gates: FarmGates.list(owner),
+          gate_count: farm.gate_count,
           prop_overrides: FarmProps.overrides(owner),
           prop_inventory: FarmProps.inventory(owner)
         }
@@ -88,26 +92,19 @@ defmodule Grange.FarmStore do
 
   @spec prop_action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
   def prop_action(owner, action) do
-    case FarmProps.action(owner, action) do
-      {:ok, :ok} ->
-        broadcast_change(owner)
-        {:ok, view(owner)}
+    with {:ok, :ok} <- FarmProps.action(owner, action), do: refresh(owner)
+  end
 
-      {:error, reason} ->
-        {:error, reason}
-    end
+  @doc "Broadcasts the farm and returns its refreshed view."
+  @spec refresh(String.t()) :: {:ok, map()}
+  def refresh(owner) do
+    broadcast_change(owner)
+    {:ok, view(owner)}
   end
 
   @spec sell(String.t(), String.t(), integer()) :: {:ok, map()} | {:error, String.t()}
   def sell(owner, item, count) when is_binary(item) and is_integer(count) and count > 0 do
-    case Barn.sell(owner, item, count) do
-      :ok ->
-        broadcast_change(owner)
-        {:ok, view(owner)}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    with :ok <- Barn.sell(owner, item, count), do: refresh(owner)
   end
 
   def sell(_owner, _item, _count), do: {:error, "invalid sale"}
@@ -133,6 +130,7 @@ defmodule Grange.FarmStore do
     Repo.delete_all(Tile)
     Repo.delete_all(BarnItem)
     Repo.delete_all(FarmFence)
+    Repo.delete_all(FarmGate)
     Repo.delete_all(FarmProp)
     Repo.delete_all(FarmRecord)
     :ok
@@ -140,7 +138,7 @@ defmodule Grange.FarmStore do
 
   defp run(owner, kind, x, y, opts) do
     bounds? =
-      if kind in [:place_fence, :remove_fence],
+      if kind in [:place_fence, :remove_fence, :place_gate, :remove_gate],
         do: x in 0..17 and y in 0..9,
         else: Farm.in_bounds?(x, y)
 
@@ -161,8 +159,7 @@ defmodule Grange.FarmStore do
         {:error, reason}
 
       {:ok, :ok} ->
-        broadcast_change(owner)
-        {:ok, view(owner)}
+        refresh(owner)
 
       {:error, _reason} ->
         {:error, "could not update farm"}
@@ -183,9 +180,17 @@ defmodule Grange.FarmStore do
     end
   end
 
-  defp mutate(owner, :place_fence, x, y, _opts), do: FarmFences.place(owner, x, y)
+  defp mutate(owner, :place_fence, x, y, _opts),
+    do: reorient_gates(owner, FarmFences.place(owner, x, y))
 
-  defp mutate(owner, :remove_fence, x, y, _opts), do: FarmFences.remove(owner, x, y)
+  defp mutate(owner, :remove_fence, x, y, _opts),
+    do: reorient_gates(owner, FarmFences.remove(owner, x, y))
+
+  defp mutate(owner, :place_gate, x, y, _opts),
+    do: reorient_gates(owner, FarmGates.place(owner, x, y))
+
+  defp mutate(owner, :remove_gate, x, y, _opts),
+    do: reorient_gates(owner, FarmGates.remove(owner, x, y))
 
   defp mutate(owner, kind, x, y, opts) do
     case tile_at(owner, x, y) do
@@ -193,6 +198,9 @@ defmodule Grange.FarmStore do
       tile -> transform(owner, tile, kind, opts)
     end
   end
+
+  defp reorient_gates(owner, :ok), do: FarmGates.reorient(owner)
+  defp reorient_gates(_owner, error), do: error
 
   defp transform(_owner, tile, :plant, opts) do
     crop = opts[:crop] || "tomato"
@@ -281,7 +289,9 @@ defmodule Grange.FarmStore do
     "water" => :water,
     "harvest" => :harvest,
     "place_fence" => :place_fence,
-    "remove_fence" => :remove_fence
+    "remove_fence" => :remove_fence,
+    "place_gate" => :place_gate,
+    "remove_gate" => :remove_gate
   }
 
   defp normalize(action) when is_map(action) do

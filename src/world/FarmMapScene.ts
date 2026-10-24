@@ -1,5 +1,7 @@
 import * as ex from "excalibur";
 import { type FarmToolId, isFarmInBounds } from "../../shared/farm";
+import type { FenceGate } from "../../shared/types";
+import { emitGateAction } from "../socket";
 import { useGameStore } from "../store";
 import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import { BlockRegistry } from "./blocking";
@@ -16,6 +18,7 @@ import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
 import { TOOL_HINTS } from "./farmTools";
 import { FarmTileSync } from "./farmSceneTiles";
+import { nearbyGate } from "./gateInteraction";
 import { InputManager } from "./InputManager";
 import {
 	FARM_PLAYER_SPAWN,
@@ -110,7 +113,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 		// Populate saved farm props and their collision/tool footprints.
 		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
-		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
+		const farm = useGameStore.getState().activeFarm;
+		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
 
 		// The train is animated separately from the static prop layer.
 		this.train = new TrainController(findTrainRest(props), this);
@@ -172,8 +176,9 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	override onPreUpdate(engine: ex.Engine, delta: number): void {
 		this.train.update(delta);
 		this.player.graphics.visible = this.train.isParked();
-		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
-		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
+		const farm = useGameStore.getState().activeFarm;
+		this.farmProps.set(farm?.prop_overrides ?? []);
+		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
 
 		// Freeze and hide the player while the inventory modal captures input,
 		// or while the train carries them in or out.
@@ -187,7 +192,11 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		updateFarmPlayer(this.player, dir, delta, this.combo.moveSpeed);
 		updateFarmerGraphics(this.player, dir);
 
-		this.travel.update(this.player, this.inputManager, engine, this.train);
+		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
+		this.travel.update(this.player, this.inputManager, engine, this.train, gate?.prompt ?? null);
+		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
+			this.toggleGate(gate.gate);
+		}
 
 		this.handleToolKeys();
 		this.syncTilesFromServer();
@@ -208,6 +217,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		if (!this.isOwner) return;
 		if (!FARM_TOOLS.includes(selectedFarmItem() ?? "")) return;
 		if (this.inputManager.consumePressed("Space")) this.actOnPlayerTile();
+	}
+
+	private toggleGate(gate: FenceGate): void {
+		emitGateAction(this.owner, { kind: "toggle_gate", x: gate.x, y: gate.y }, (result) => {
+			if (!result.ok) this.report(result.error ?? "Could not move gate.");
+		});
 	}
 
 	private actOnPlayerTile(): void {
@@ -248,7 +263,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		)
 			return;
 
-		if (item === "fence" || item === "shovel") {
+		if (item === "fence" || item === "gate" || item === "shovel") {
 			actOnFence(this.owner, column, row, item, this.blocks, this.player.pos, (message) =>
 				this.report(message),
 			);
