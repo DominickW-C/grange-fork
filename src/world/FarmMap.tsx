@@ -12,13 +12,14 @@ import { useGameStore } from "../store";
 import "../inventory/inventory.css";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import { useInventoryKeys } from "../inventory/useInventoryKeys";
-import { MOVABLE_PROP_ASSETS } from "./mapData";
+import { useInventoryPersistence } from "../inventory/useInventoryPersistence";
 import { type CasinoOverlay, CasinoOverlays } from "./CasinoOverlays";
 import { CasinoScene } from "./CasinoScene";
-import { casinoResources } from "./casinoResources";
 import { ComboCounter } from "./ComboCounter";
+import { casinoResources } from "./casinoResources";
 import { FarmMapScene } from "./FarmMapScene";
 import type { FarmHudSnapshot } from "./farmHud";
+import { MOVABLE_PROP_ASSETS } from "./mapData";
 import "./farmMap.css";
 import { MarketplaceScene } from "./MarketplaceScene";
 import { MarketWindow } from "./MarketWindow";
@@ -48,6 +49,7 @@ export default function FarmMap() {
 	const heldTool = farmToolForItem(heldItem);
 	const setItemCount = useInventoryStore((s) => s.setItemCount);
 	const setInventoryOpen = useInventoryStore((s) => s.setInventoryOpen);
+	const inventoryHydrated = useInventoryStore((s) => s.inventoryHydrated);
 	const pushNotice = useNotificationStore((s) => s.push);
 	const paused = usePauseStore((s) => s.paused);
 	const setPaused = usePauseStore((s) => s.setPaused);
@@ -94,8 +96,13 @@ export default function FarmMap() {
 	}, [selectedHotbar]);
 
 	useEffect(() => {
-		if (heldItem === "fence") pushNotice("Fence: click clear grass to place a post.", "system");
-		if (heldItem === "shovel") pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
+		if (heldItem === "fence")
+			pushNotice("Fence: click clear grass to place a post.", "system");
+		if (heldItem === "shovel")
+			pushNotice(
+				"Shovel: click a fence or farm object to dig it up.",
+				"system",
+			);
 		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
 			pushNotice(`Click clear ground to place ${heldItem}.`, "system");
 	}, [heldItem, pushNotice]);
@@ -115,9 +122,15 @@ export default function FarmMap() {
 	// Keep the local inventory's produce in sync with the authoritative barn.
 	useBarnReconcile(farm?.barn ?? null, isOwner);
 
+	// Persist the signed-in account's layout after any local inventory change.
+	// The visited farm may belong to someone else; the save is scoped by session.
+	useInventoryPersistence(inventoryHydrated, username);
+
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
-	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(null);
+	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(
+		null,
+	);
 	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
@@ -217,7 +230,8 @@ export default function FarmMap() {
 
 	// The farm channel join is what sets `farm`; until it lands, an action would
 	// be dropped by emitFarmAction, so the world isn't interactive yet.
-	const worldReady = engineReady && farm !== null;
+	const worldReady =
+		engineReady && farm !== null && (!isOwner || inventoryHydrated);
 
 	return (
 		<main
@@ -252,7 +266,9 @@ export default function FarmMap() {
 					</p>
 				</div>
 			)}
-			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
+			{(!isOwner || inventoryHydrated) && (
+				<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
+			)}
 			<ComboCounter />
 			<InventoryPanel />
 			{paused && <PauseMenu />}

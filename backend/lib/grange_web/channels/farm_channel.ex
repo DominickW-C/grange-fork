@@ -8,7 +8,7 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
-  alias Grange.FarmStore
+  alias Grange.{FarmStore, Inventory}
 
   @impl true
   def join("farm:" <> owner, _payload, socket) do
@@ -63,8 +63,13 @@ defmodule GrangeWeb.FarmChannel do
 
   defp act(socket, owner, action) do
     case FarmStore.action(owner, action) do
-      {:ok, _farm} -> {:reply, :ok, socket}
-      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+      {:ok, farm} ->
+        reply = %{seeds: Inventory.seeds(owner), drops: Map.get(farm, :drops, [])}
+        {:reply, {:ok, reply}, socket}
+
+      {:error, reason} ->
+        reply = %{error: reason, seeds: Inventory.seeds(owner)}
+        {:reply, {:error, reply}, socket}
     end
   end
 

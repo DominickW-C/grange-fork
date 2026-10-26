@@ -20,11 +20,15 @@ defmodule Grange.FarmStore do
     Crops,
     Farm,
     FarmAction,
+    FarmBootstrap,
     FarmFence,
     FarmFences,
     FarmProp,
     FarmProps,
     FarmRecord,
+    Inventory,
+    InventoryItem,
+    InventorySlot,
     Repo,
     Tile
   }
@@ -35,15 +39,12 @@ defmodule Grange.FarmStore do
 
   @spec ensure(String.t()) :: map()
   def ensure(owner) do
-    case Repo.get(FarmRecord, owner) do
-      nil ->
-        %FarmRecord{owner: owner, tomatoes: 0} |> Repo.insert!()
-        broadcast_change(owner)
-
-      _farm ->
-        :ok
+    case FarmBootstrap.ensure(owner) do
+      :created -> broadcast_change(owner)
+      :existing -> :ok
     end
 
+    Inventory.ensure(owner)
     view(owner)
   end
 
@@ -130,11 +131,11 @@ defmodule Grange.FarmStore do
 
   @spec reset() :: :ok
   def reset do
-    Repo.delete_all(Tile)
-    Repo.delete_all(BarnItem)
-    Repo.delete_all(FarmFence)
-    Repo.delete_all(FarmProp)
-    Repo.delete_all(FarmRecord)
+    Enum.each(
+      [Tile, BarnItem, InventoryItem, InventorySlot, FarmFence, FarmProp, FarmRecord],
+      &Repo.delete_all/1
+    )
+
     :ok
   end
 
@@ -152,20 +153,27 @@ defmodule Grange.FarmStore do
   end
 
   defp apply_action(owner, kind, x, y, opts) do
-    case Repo.transaction(fn -> mutate(owner, kind, x, y, opts) end) do
+    case Repo.transaction(fn -> mutate_or_rollback(owner, kind, x, y, opts) end) do
       {:ok, {:drops, drops}} ->
         broadcast_change(owner)
         {:ok, Map.put(view(owner), :drops, drops)}
-
-      {:ok, {:error, reason}} ->
-        {:error, reason}
 
       {:ok, :ok} ->
         broadcast_change(owner)
         {:ok, view(owner)}
 
+      {:error, reason} when is_binary(reason) ->
+        {:error, reason}
+
       {:error, _reason} ->
         {:error, "could not update farm"}
+    end
+  end
+
+  defp mutate_or_rollback(owner, kind, x, y, opts) do
+    case mutate(owner, kind, x, y, opts) do
+      {:error, reason} -> Repo.rollback(reason)
+      result -> result
     end
   end
 
@@ -194,11 +202,13 @@ defmodule Grange.FarmStore do
     end
   end
 
-  defp transform(_owner, tile, :plant, opts) do
+  defp transform(owner, tile, :plant, opts) do
     crop = opts[:crop] || "tomato"
     total = Crops.get(crop)[:harvests] || 1
+    seed = Inventory.seed_item(crop)
 
-    with {:ok, planted} <- Farm.plant(tile, now_ms()) do
+    with :ok <- Inventory.take(owner, seed, 1),
+         {:ok, planted} <- Farm.plant(tile, now_ms()) do
       update_tile(tile, %{planted | crop: Crops.encode_crop(crop, total)})
     end
   end
@@ -223,6 +233,7 @@ defmodule Grange.FarmStore do
         Barn.add(owner, crop_id, 1)
         families = neighbor_families(owner, tile.x, tile.y)
         drops = FarmAction.mutation_drops(crop_id, tile.state, families, opts, :rand.uniform())
+        Enum.each(drops, &Inventory.add(owner, &1, 1))
         regrow_or_clear(owner, tile, crop_id, remaining)
         {:drops, drops}
 
@@ -326,15 +337,7 @@ defmodule Grange.FarmStore do
   end
 
   defp tile_view(tile) do
-    %{
-      x: tile.x,
-      y: tile.y,
-      state: tile.state,
-      crop: tile.crop,
-      planted_at: tile.planted_at,
-      watered_at: tile.watered_at,
-      ready_at: tile.ready_at
-    }
+    Map.take(tile, [:x, :y, :state, :crop, :planted_at, :watered_at, :ready_at])
   end
 
   defp summary(farm) do

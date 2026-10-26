@@ -2,7 +2,7 @@ defmodule Grange.FarmStoreTest do
   @moduledoc false
   use ExUnit.Case, async: false
 
-  alias Grange.{Farm, FarmStore}
+  alias Grange.{Farm, FarmStore, Inventory}
 
   setup do
     FarmStore.reset()
@@ -174,6 +174,32 @@ defmodule Grange.FarmStoreTest do
     assert %{state: :watered} = tile_at("Alice", 0, 0)
   end
 
+  test "planting spends one seed and a rejected plant refunds it" do
+    FarmStore.ensure("Alice")
+    FarmStore.action("Alice", %{"kind" => "till", "x" => 0, "y" => 0})
+    FarmStore.action("Alice", %{"kind" => "till", "x" => 1, "y" => 0})
+
+    assert {:ok, _} = FarmStore.action("Alice", %{"kind" => "plant", "x" => 0, "y" => 0})
+    assert Inventory.seeds("Alice")["seed-bag"] == 9
+
+    assert {:error, "tile is not tilled"} =
+             FarmStore.action("Alice", %{"kind" => "plant", "x" => 0, "y" => 0})
+
+    assert Inventory.seeds("Alice")["seed-bag"] == 9
+  end
+
+  test "planting without a seed leaves the tile tilled" do
+    FarmStore.ensure("Alice")
+    FarmStore.action("Alice", %{"kind" => "till", "x" => 0, "y" => 0})
+    assert :ok = Inventory.take("Alice", "seed-bag", 10)
+
+    assert {:error, "no seeds"} =
+             FarmStore.action("Alice", %{"kind" => "plant", "x" => 0, "y" => 0})
+
+    assert %{state: :tilled} = tile_at("Alice", 0, 0)
+    assert Inventory.seeds("Alice")["seed-bag"] == 0
+  end
+
   test "watering rejects untilled and already-watered tiles; unknown kinds are invalid" do
     FarmStore.ensure("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 1, "y" => 1})
@@ -225,6 +251,7 @@ defmodule Grange.FarmStoreTest do
 
   test "wheat cannot be harvested by hand and banks its own barn item" do
     FarmStore.ensure("Alice")
+    Inventory.add("Alice", "wheat-seed", 1)
     FarmStore.action("Alice", %{"kind" => "till", "x" => 2, "y" => 2})
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 2, "y" => 2, "crop" => "wheat"})
     grow("Alice", 2, 2)
