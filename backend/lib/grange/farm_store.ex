@@ -315,15 +315,15 @@ defmodule Grange.FarmStore do
 
   defp fetch(map, key), do: Map.get(map, key) || Map.get(map, String.to_atom(key))
   defp to_integer(value) when is_integer(value), do: value
-  defp to_integer(value) when is_binary(value), do: safe_to_integer(value)
-  defp to_integer(_value), do: nil
 
-  defp safe_to_integer(value) do
+  defp to_integer(value) when is_binary(value) do
     case Integer.parse(value) do
       {int, ""} -> int
       _ -> nil
     end
   end
+
+  defp to_integer(_value), do: nil
 
   defp tile_at(owner, x, y) do
     Repo.one(from(t in Tile, where: t.owner == ^owner and t.x == ^x and t.y == ^y))

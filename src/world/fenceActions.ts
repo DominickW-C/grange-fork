@@ -1,3 +1,4 @@
+import type { ActiveFarm } from "../../shared/types";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
@@ -10,6 +11,20 @@ export function selectedFarmItem() {
 	return inventory.hotbar[inventory.selectedHotbar]?.itemId ?? null;
 }
 
+export function fencePlacementReason(farm: ActiveFarm,
+	column: number, row: number, blocks: BlockRegistry,
+	player: { x: number; y: number }): string | null {
+	if (!fenceInBounds(column, row)) return "Keep fences on dry land.";
+	if (farm.fence_count <= 0) return "No fences left in inventory.";
+	if (blocks.isBlocked(column, row) ||
+		(farm.fences ?? []).some(({ x, y }) => fenceKey(x, y) === fenceKey(column, row)) ||
+		(farm.gates ?? []).some(({ x, y }) => fenceKey(x, y) === fenceKey(column, row)) ||
+		farm.tiles.some((tile) => tile.x === column && tile.y === row) ||
+		(column === Math.floor(player.x / TILE_SIZE) && row === Math.floor(player.y / TILE_SIZE)))
+		return "That tile is occupied.";
+	return null;
+}
+
 export function actOnFence(owner: string, column: number, row: number,
 	item: "fence" | "gate" | "shovel", blocks: BlockRegistry,
 	player: { x: number; y: number }, report: (message: string) => void): void {
@@ -20,15 +35,16 @@ export function actOnFence(owner: string, column: number, row: number,
 	const fenceHere = fences.some(({ x, y }) => fenceKey(x, y) === fenceKey(column, row));
 	const gateHere = gates.some(({ x, y }) => fenceKey(x, y) === fenceKey(column, row));
 
-	if (item === "fence" || item === "gate") {
-		const supply = item === "fence" ? farm.fence_count : farm.gate_count;
-		const exists = item === "fence" ? fenceHere : gateHere;
-		const occupied = item === "fence" ? gateHere : fenceHere;
+	if (item === "fence") {
+		const reason = fencePlacementReason(farm, column, row, blocks, player);
+		if (reason) { report(reason); return; }
+	}
+	if (item === "gate") {
 		if (!fenceInBounds(column, row) || !isTillableTile(column, row) ||
-			blocks.isBlocked(column, row) || exists || occupied || supply <= 0 ||
+			blocks.isBlocked(column, row) || fenceHere || gateHere || farm.gate_count <= 0 ||
 			(column === Math.floor(player.x / TILE_SIZE) && row === Math.floor(player.y / TILE_SIZE)) ||
 			farm.tiles.some((tile) => tile.x === column && tile.y === row)) {
-			report(item === "fence" ? "Place fences on clear grass." : "Place gates on clear grass.");
+			report("Place gates on clear grass.");
 			return;
 		}
 	}

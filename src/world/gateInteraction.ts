@@ -1,4 +1,5 @@
 import type { FenceGate } from "../../shared/types";
+import { emitGateAction } from "../socket";
 import { TILE_SIZE } from "./mapData";
 
 export interface NearbyGate {
@@ -27,4 +28,11 @@ export function nearbyGate(
 			? "Press E or Enter to close gate"
 			: "Press E or Enter to open gate",
 	};
+}
+
+export function toggleGate(owner: string, gate: FenceGate,
+	report: (message: string) => void): void {
+	emitGateAction(owner, { kind: "toggle_gate", x: gate.x, y: gate.y }, (result) => {
+		if (!result.ok) report(result.error ?? "Could not move gate.");
+	});
 }

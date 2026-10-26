@@ -163,12 +163,30 @@ defmodule Grange.FarmStoreTest do
 
     FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 2})
 
-    assert {:error, "invalid placement"} =
+    assert {:ok, _} =
              FarmStore.prop_action("Alice", %{
                "kind" => "place",
                "asset" => "well",
                "x" => 480,
                "y" => 704
+             })
+
+    assert {:ok, _} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 2})
+
+    assert {:error, "invalid placement"} =
+             FarmStore.prop_action("Alice", %{
+               "kind" => "place",
+               "asset" => "well",
+               "x" => 480,
+               "y" => 706
+             })
+
+    assert {:error, "invalid placement"} =
+             FarmStore.prop_action("Alice", %{
+               "kind" => "place",
+               "asset" => "well",
+               "x" => 480,
+               "y" => -2
              })
   end
 

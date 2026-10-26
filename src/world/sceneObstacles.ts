@@ -26,9 +26,9 @@ export const farmFootprints: Partial<Record<PropKey, PropFootprint>> = {
 /** Flowers take up a little ground when placing props, but remain walk-through. */
 export const farmPlacementFootprints: Partial<Record<PropKey, PropFootprint>> = {
 	...farmFootprints,
-	daisies: { width: 0.7, depth: 18 },
-	marigolds: { width: 0.7, depth: 18 },
-	"blue-flowers": { width: 0.7, depth: 18 },
+	daisies: { width: 0.25, depth: 18 },
+	marigolds: { width: 0.25, depth: 18 },
+	"blue-flowers": { width: 0.25, depth: 18 },
 };
 
 const marketplaceFootprints: Partial<

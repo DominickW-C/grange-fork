@@ -12,6 +12,7 @@ is larger than the repository's 1 MiB limit.
 - `buildings/`: four tightly cropped transparent sprites.
 - `objects/`: non-fence object sprites.
 - `fences/`: twenty lossless transparent pieces split from the modular fence atlas.
+- `animals/`: four species, each with twelve separate transparent animation frames and a frame manifest.
 - `manifest.json`: filenames, pixel dimensions, normalized anchors, and terrain frame positions.
 
 All files are below 1 MiB. Transparent sprites use a bottom-center anchor (`0.5, 1`); terrain tiles
@@ -71,4 +72,10 @@ gates, and the Shovel returns a gate to the owner's gate supply.
 
 The same Shovel picks up all starter farm props except the train. Each farm saves moved
 positions and carried objects independently. Move a prop from inventory to the hotbar,
-select it, and click clear ground to place it; the farmhouse and barn work this way too.
+select it, hold the left mouse button to preview its footprint, and release on green to
+place it; the farmhouse and barn work this way too. Fence posts use the same hold-and-release
+preview and can also be placed on clear path tiles. Gates retain click-to-place behavior.
+
+The animal frames were cropped from four separate user-provided sheets without resizing or
+repainting. See `animals/README.md` for frame names and source-position metadata. The animal
+art has not yet been wired into gameplay.
