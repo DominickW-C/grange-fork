@@ -8,6 +8,7 @@
     "bootstrap": "node scripts/bootstrap.mjs",
     "postinstall": "node scripts/install-git-hooks.mjs",
     "hooks:install": "node scripts/install-git-hooks.mjs",
+    "predev": "node scripts/bootstrap.mjs",
     "dev": "concurrently -k -n backend,web -c blue,magenta \"pnpm dev:backend\" \"pnpm dev:web\"",
     "dev:backend": "node scripts/run-mix.mjs phx.server",
     "dev:web": "vite",
