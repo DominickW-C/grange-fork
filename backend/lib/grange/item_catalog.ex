@@ -6,13 +6,14 @@ defmodule Grange.ItemCatalog do
   invented item ids and over-full stacks.
   """
 
-  @single_stack ~w(hoe watering-can scythe shovel)
+  @single_stack ~w(hoe watering-can scythe shovel bamboo fiberglass carbon master)
 
   @stackable ~w(
     seed-bag tomato wheat lettuce midas_wheat frost_lettuce sunburst_tomato
     wheat-seed lettuce-seed midas-wheat-seed frost-lettuce-seed sunburst-tomato-seed
-    fence farmhouse barn well bench sign barrel crate oak-tree pine-tree apple-tree
+    fence gate farmhouse barn well bench sign barrel crate oak-tree pine-tree apple-tree
     daisies marigolds blue-flowers
+    minnow bluegill carp catfish trout salmon golden-carp phishing loan-sharks-brother
   )
 
   @doc "Maximum stack size for a known item id, or nil for an unknown item."

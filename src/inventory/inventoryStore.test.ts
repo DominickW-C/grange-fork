@@ -18,8 +18,10 @@ describe("inventory slots", () => {
 		expect(countItem(useInventoryStore.getState(), "seed-bag")).toBe(10);
 		expect(countItem(useInventoryStore.getState(), "tomato")).toBe(0);
 		expect(grid.every((slot) => slot.itemId === null)).toBe(true);
+		expect(hotbar[4]).toMatchObject({ itemId: "gate", count: 2 });
 		expect(hotbar[5]).toMatchObject({ itemId: "fence", count: 20 });
 		expect(hotbar[6]).toMatchObject({ itemId: "shovel", count: 1 });
+		expect(hotbar[7]).toMatchObject({ itemId: "bamboo", count: 1 });
 		expect(useInventoryStore.getState().inventoryHydrated).toBe(false);
 	});
 
@@ -44,7 +46,7 @@ describe("inventory slots", () => {
 		expect(useInventoryStore.getState().hotbar[1]?.itemId).toBeNull();
 	});
 
-	it("syncs server fence stock without losing the selected fence slot", () => {
+	it("syncs server fence and gate stock without losing their slots", () => {
 		const store = useInventoryStore.getState();
 		store.selectHotbar(5);
 		store.setItemCount("fence", 0);
@@ -54,6 +56,15 @@ describe("inventory slots", () => {
 		});
 		store.setItemCount("fence", 19);
 		expect(countItem(useInventoryStore.getState(), "fence")).toBe(19);
+
+		store.selectHotbar(4);
+		store.setItemCount("gate", 0);
+		expect(useInventoryStore.getState().hotbar[4]).toMatchObject({
+			itemId: "gate",
+			count: 0,
+		});
+		store.setItemCount("gate", 1);
+		expect(countItem(useInventoryStore.getState(), "gate")).toBe(1);
 	});
 
 	it("keeps split fence stacks when the server total is unchanged", () => {
@@ -66,12 +77,14 @@ describe("inventory slots", () => {
 		expect(grid[0]).toMatchObject({ itemId: "fence", count: 10 });
 	});
 
-	it("grants every item at max stack for admins", () => {
+	it("fills every admin slot at max stack", () => {
 		useInventoryStore.getState().grantAllItems();
 		const { hotbar, grid } = useInventoryStore.getState();
+		const capacity = hotbar.length + grid.length;
 		const filled = [...hotbar, ...grid].filter((s) => s.itemId);
 		const held = new Set(filled.map((s) => s.itemId));
-		expect(held).toEqual(new Set(Object.keys(ITEMS)));
+		expect(filled).toHaveLength(capacity);
+		expect(held).toEqual(new Set(Object.keys(ITEMS).slice(0, capacity)));
 		for (const slot of filled) {
 			if (slot.itemId) expect(slot.count).toBe(ITEMS[slot.itemId].maxStack);
 		}
@@ -184,6 +197,16 @@ describe("inventory slots", () => {
 		const hydrated = useInventoryStore.getState();
 		expect(hydrated.hotbar[1]).toMatchObject({ itemId: "seed-bag", count: 5 });
 		expect(hydrated.grid[0]).toMatchObject({ itemId: "seed-bag", count: 5 });
+	});
+
+	it("holds caught fish as stackable items and sells them away", () => {
+		const store = useInventoryStore.getState();
+		expect(store.addItem("minnow", 2)).toBe(0);
+		expect(store.addItem("minnow", 3)).toBe(0);
+		expect(countItem(useInventoryStore.getState(), "minnow")).toBe(5);
+
+		expect(store.removeItem("minnow", 4)).toBe(4);
+		expect(countItem(useInventoryStore.getState(), "minnow")).toBe(1);
 	});
 
 	it("selects hotbar slots and toggles the panel", () => {

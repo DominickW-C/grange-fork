@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { usePauseStore } from "../pause/pauseStore";
+import { STARTER_ROD } from "../world/fishingData";
 import { buildAdminInventory } from "./adminInventory";
 import {
 	GRID_SIZE,
@@ -42,8 +43,10 @@ function buildInitialHotbar(): InventorySlot[] {
 	hotbar[1] = stack("seed-bag", 10);
 	hotbar[2] = stack("watering-can", 1);
 	hotbar[3] = stack("scythe", 1);
+	hotbar[4] = stack("gate", 2);
 	hotbar[5] = stack("fence", 20);
 	hotbar[6] = stack("shovel", 1);
+	hotbar[7] = stack(STARTER_ROD, 1);
 	return hotbar;
 }
 
@@ -237,12 +240,13 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
 	setItemCount: (itemId, count) => {
 		const state = get();
+		const keepsEmptySlot = itemId === "fence" || itemId === "gate";
 		const next = reconcileItemCount(
 			state.grid,
 			state.hotbar,
 			itemId,
 			count,
-			itemId === "fence",
+			keepsEmptySlot,
 		);
 		set({ grid: next.grid, hotbar: next.hotbar });
 	},

@@ -181,11 +181,13 @@ defmodule Grange.Inventory do
   end
 
   defp starter_layout(owner) do
+    farm = Repo.get(FarmRecord, owner)
+
     fence =
-      case Repo.get(FarmRecord, owner) do
-        %{fence_count: count} -> count
-        nil -> 20
-      end
+      if farm, do: farm.fence_count, else: 20
+
+    gate =
+      if farm, do: farm.gate_count, else: 2
 
     seed_bag = owner |> seeds() |> Map.get("seed-bag", 0)
 
@@ -193,9 +195,11 @@ defmodule Grange.Inventory do
       %{area: "hotbar", slot: 0, item: "hoe", count: 1},
       %{area: "hotbar", slot: 2, item: "watering-can", count: 1},
       %{area: "hotbar", slot: 3, item: "scythe", count: 1},
-      %{area: "hotbar", slot: 6, item: "shovel", count: 1}
+      %{area: "hotbar", slot: 6, item: "shovel", count: 1},
+      %{area: "hotbar", slot: 7, item: "bamboo", count: 1}
     ]
     |> add_if_positive("hotbar", 5, "fence", fence)
+    |> add_if_positive("hotbar", 4, "gate", gate)
     |> add_if_positive("hotbar", 1, "seed-bag", seed_bag)
   end
 

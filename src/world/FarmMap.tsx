@@ -18,6 +18,7 @@ import { CasinoScene } from "./CasinoScene";
 import { ComboCounter } from "./ComboCounter";
 import { casinoResources } from "./casinoResources";
 import { FarmMapScene } from "./FarmMapScene";
+import { FishingOverlay } from "./FishingOverlay";
 import type { FarmHudSnapshot } from "./farmHud";
 import { MOVABLE_PROP_ASSETS } from "./mapData";
 import "./farmMap.css";
@@ -97,20 +98,36 @@ export default function FarmMap() {
 
 	useEffect(() => {
 		if (heldItem === "fence")
-			pushNotice("Fence: click clear grass to place a post.", "system");
+			pushNotice(
+				"Hold left mouse to preview a fence; release on green to place.",
+				"system",
+			);
+		if (heldItem === "gate")
+			pushNotice(
+				"Gate: click clear grass to place. Press E nearby to open or close.",
+				"system",
+			);
 		if (heldItem === "shovel")
 			pushNotice(
 				"Shovel: click a fence or farm object to dig it up.",
 				"system",
 			);
 		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
-			pushNotice(`Click clear ground to place ${heldItem}.`, "system");
+			pushNotice(
+				`Hold left mouse to preview ${heldItem}; release on green to place.`,
+				"system",
+			);
 	}, [heldItem, pushNotice]);
 
 	const fenceCount = farm?.fence_count;
 	useEffect(() => {
 		if (fenceCount !== undefined && isOwner) setItemCount("fence", fenceCount);
 	}, [fenceCount, isOwner, setItemCount]);
+
+	const gateCount = farm?.gate_count;
+	useEffect(() => {
+		if (gateCount !== undefined && isOwner) setItemCount("gate", gateCount);
+	}, [gateCount, isOwner, setItemCount]);
 
 	const propInventory = farm?.prop_inventory;
 	useEffect(() => {
@@ -131,6 +148,7 @@ export default function FarmMap() {
 	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(
 		null,
 	);
+	const [fishingOpen, setFishingOpen] = useState(false);
 	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
@@ -149,7 +167,16 @@ export default function FarmMap() {
 			backgroundColor: ex.Color.fromHex("#79a44d"),
 		});
 
-		const scene = new FarmMapScene(target, isOwner, setTravelPrompt, setArea);
+		const scene = new FarmMapScene(
+			target,
+			isOwner,
+			setTravelPrompt,
+			setArea,
+			() => {
+				scene.setOverlayPaused(true);
+				setFishingOpen(true);
+			},
+		);
 		scene.onFarmUpdate = (snapshot) => {
 			if (cancelled) return;
 			setHud(snapshot);
@@ -215,6 +242,7 @@ export default function FarmMap() {
 		return () => {
 			setPaused(false);
 			setInventoryOpen(false);
+			setFishingOpen(false);
 		};
 	}, [setPaused, setInventoryOpen]);
 
@@ -226,6 +254,11 @@ export default function FarmMap() {
 	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
 		setCasinoOverlay(null);
+	}
+
+	function closeFishing() {
+		sceneRef.current?.setOverlayPaused(false);
+		setFishingOpen(false);
 	}
 
 	// The farm channel join is what sets `farm`; until it lands, an action would
@@ -272,6 +305,7 @@ export default function FarmMap() {
 			<ComboCounter />
 			<InventoryPanel />
 			{paused && <PauseMenu />}
+			{fishingOpen && <FishingOverlay onClose={closeFishing} />}
 			<CasinoOverlays open={casinoOverlay} onClose={closeCasinoOverlay} />
 		</main>
 	);
