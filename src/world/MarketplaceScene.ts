@@ -32,6 +32,7 @@ export class MarketplaceScene extends WalkingScene {
 		super({
 			area: "Marketplace",
 			spawn: ex.vec(MARKETPLACE_PLAYER_SPAWN.x, MARKETPLACE_PLAYER_SPAWN.y),
+			hubArea: "marketplace",
 			obstacles: marketplaceWalkObstacles,
 			interactions: [
 				{
@@ -100,10 +101,12 @@ export class MarketplaceScene extends WalkingScene {
 			this.player.graphics.visible = false;
 			this.player.vel = ex.Vector.Zero;
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
+			// Keep the hub live while the local player rides the train.
+			this.updateHub(delta);
 			return;
 		}
-		super.onPreUpdate(engine, delta);
 		this.player.graphics.visible = true;
+		super.onPreUpdate(engine, delta);
 	}
 
 	/** Plays the train's departure, resolving once it has left the screen. */

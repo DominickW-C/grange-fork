@@ -1,5 +1,14 @@
 import * as ex from "excalibur";
+import type { HubArea } from "../../shared/types";
+import { useGameStore } from "../store";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
+import {
+	getHubPeers,
+	joinHub,
+	leaveHub,
+	publishHubPosition,
+} from "./hubClient";
+import { HubPlayers } from "./hubPlayers";
 import { InputManager } from "./InputManager";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { updateWalkingPlayer } from "./playerMovement";
@@ -42,6 +51,8 @@ interface WalkingSceneOptions {
 	spawn: ex.Vector;
 	interactions: SceneInteraction[];
 	obstacles: WalkObstacle[];
+	/** Shared hub areas show other players; leave unset for private scenes. */
+	hubArea?: HubArea | null;
 	onAreaChange: (area: WorldArea) => void;
 	onPromptChange: (prompt: string | null) => void;
 }
@@ -52,6 +63,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 	private activePrompt: string | null = null;
 	private traveling = false;
 	private paused = false;
+	private hubPlayers?: HubPlayers;
 	private readonly playerSpeed = 160;
 
 	constructor(private readonly options: WalkingSceneOptions) {
@@ -68,6 +80,10 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		});
 		addFarmerGraphics(this.player);
 		this.add(this.player);
+		if (this.options.hubArea) {
+			const username = useGameStore.getState().username;
+			this.hubPlayers = new HubPlayers(this, this.player, username || "Farmer");
+		}
 		this.camera.pos = ex.vec(MAP_WIDTH / 2, MAP_HEIGHT / 2);
 	}
 
@@ -83,6 +99,11 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.paused = false;
 		this.options.onAreaChange(this.options.area);
 		this.setPrompt(null);
+		if (this.options.hubArea) {
+			joinHub(this.options.hubArea);
+			this.hubPlayers?.sync(getHubPeers());
+			publishHubPosition(this.player.pos.x, this.player.pos.y);
+		}
 	}
 
 	/** Freezes movement and input while a DOM overlay owns the screen. */
@@ -99,7 +120,16 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		}
 	}
 
+	/** Syncs and eases remote avatars; subclasses may call it before returning. */
+	protected updateHub(delta: number): void {
+		this.hubPlayers?.sync(getHubPeers());
+		this.hubPlayers?.update(delta);
+	}
+
 	override onPreUpdate(engine: ex.Engine, delta: number): void {
+		// Other players keep moving while a DOM overlay pauses the local player.
+		this.updateHub(delta);
+
 		if (!this.inputManager || this.paused) return;
 		// Freeze the player while a travel animation (the train leaving) plays.
 		if (this.traveling) {
@@ -116,6 +146,9 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			this.options.obstacles,
 		);
 		updateFarmerGraphics(this.player, direction);
+		if (this.options.hubArea) {
+			publishHubPosition(this.player.pos.x, this.player.pos.y);
+		}
 
 		const interaction = this.options.interactions.find(
 			(candidate) =>
@@ -156,6 +189,8 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.inputManager?.destroy();
 		this.inputManager = undefined;
 		this.setPrompt(null);
+		this.hubPlayers?.clear();
+		if (this.options.hubArea) leaveHub();
 	}
 
 	private setPrompt(prompt: string | null): void {

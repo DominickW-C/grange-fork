@@ -239,7 +239,7 @@ path serves the built `index.html`.
 
 ### 5.6 Phoenix Channels protocol
 
-The SPA uses one shared socket and two channels:
+The SPA uses one shared socket and three channel families:
 
 #### `lobby`
 
@@ -284,6 +284,25 @@ Authorization rules (`FarmChannel`):
 - Visitors may join any existing farm read-only.
 - Visitors may toggle gates but cannot place/remove fences or gates.
 - Prop actions and produce sales are owner-only.
+
+#### `hub:<area>`
+
+The shared hub areas: `hub:marketplace` and `hub:casino`. These are the only
+multiplayer spaces. Farms never join a hub channel.
+
+- Join requires a signed-in socket (`{"error": "not logged in"}` otherwise) and
+  an area of `marketplace` or `casino` (`"unknown area"` otherwise). The reply is
+  `{ "area": "<area>" }`; Phoenix then pushes `presence_state` / `presence_diff`.
+- Presence is keyed by **username** with meta
+  `{ "name", "x", "y", "at" }` (`at` is epoch ms). A second tab adds another
+  meta under the same key; the client shows only the newest one.
+- Client event `move` with `{x, y}` updates this channel's presence meta.
+  Positions are clamped to `x 16..1136`, `y 32..752` and moves closer than 50 ms
+  apart are rejected with `{error: "move ignored"}`. Replies are otherwise `:ok`.
+- Hub positions are **cosmetic**. The server does not simulate movement,
+  collision, or persistence, and presence is in-memory only.
+
+See `notes/hub-multiplayer.md` for the client flow and tuning constants.
 
 ### 5.7 Farm action round trip
 
@@ -362,6 +381,13 @@ The train (`TrainController`) animates departures/arrivals and gates boarding.
 Travel destinations and spawn points live in `mapData.ts`,
 `marketplaceData.ts`, and `casinoData.ts`.
 
+The marketplace and casino are **hub areas**: a `WalkingScene` with `hubArea`
+joins `hub:<area>` on activate, leaves on deactivate, and publishes the local
+position at ~10 Hz while moving. `HubPlayers` renders the other players from
+`getHubPeers()`, easing them toward their reported positions with usernames
+above their heads. Farms have no hub area and stay private. `FarmMap` exposes
+the current peer names as `data-hub-peers` for e2e tests; it is not rendered UI.
+
 ---
 
 ## 6. Repository map
@@ -400,6 +426,9 @@ Travel destinations and spawn points live in `mapData.ts`,
 │       ├── FarmMapScene.ts    ← farm gameplay scene
 │       ├── WalkingScene.ts    ← base scene for marketplace/casino
 │       ├── MarketplaceScene.ts / CasinoScene.ts
+│       ├── hubClient.ts       ← hub channel, presence peers, move throttle
+│       ├── hubPlayers.ts      ← remote avatars + username labels
+│       ├── hubInterpolation.ts← easing/snap helpers (tested)
 │       ├── mapData.ts         ← terrain/props/grid/spawn constants
 │       ├── marketplaceData.ts / casinoData.ts
 │       ├── farmState.ts       ← client-local farm simulation (tests/local)
@@ -423,6 +452,7 @@ Travel destinations and spawn points live in `mapData.ts`,
 │   │   ├── farm_store.ex      ← farm transactions, views, tick, broadcasts
 │   │   ├── farm_ticker.ex     ← 1s GenServer driving FarmStore.tick/0
 │   │   ├── farm.ex            ← pure tile state machine + bounds
+│   │   ├── hub.ex             ← hub area whitelist + position clamping
 │   │   ├── crops.ex           ← Elixir mirror of crop registry/mechanics
 │   │   ├── farm_action.ex     ← action opts + mutation drop roll
 │   │   ├── barn.ex / barn_item.ex
@@ -434,7 +464,8 @@ Travel destinations and spawn points live in `mapData.ts`,
 │   │   ├── endpoint.ex        ← socket + static + session + router
 │   │   ├── router.ex          ← /api routes + SPA fallback
 │   │   ├── user_socket.ex     ← token auth in connect params
-│   │   ├── channels/{lobby,farm}_channel.ex
+│   │   ├── presence.ex        ← ephemeral hub presence tracker
+│   │   ├── channels/{lobby,farm,hub}_channel.ex
 │   │   └── controllers/{auth,economy,health,page,fallback}_controller.ex
 │   ├── priv/repo/migrations/  ← auto-run on boot
 │   └── test/                  ← ExUnit + support helpers + Credo checks
@@ -777,6 +808,9 @@ reason (the repo already has one for a deliberate hook dependency).
 - Tile interactions use `clickFarmTile` / `hoverFarmTile`, which map tile
   coordinates to page pixels using `MAP_COLUMNS`/`MAP_ROWS`.
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid.
+- Hub tests use two browser contexts (`browser.newContext()`) and
+  `waitForHubPeer`/`waitForHubPeerGone`, which read the `data-hub-peers`
+  attribute exposed by `FarmMap`.
 - e2e runs against the **built** SPA served by Phoenix on port 3201, not Vite.
 - `pnpm test:e2e` runs `vite build` first. If you changed frontend code, do not
   run Playwright without rebuilding.
@@ -986,6 +1020,17 @@ runs Gitleaks.
     decrements the local seed count, then emits `farmAction`; a rejected plant
     loses that seed. This is the one intentional optimistic mutation — don't
     copy the pattern for tiles or barn counts.
+30. **Hub presence is ephemeral and cosmetic.** Marketplace/casino players are
+    tracked in memory by `GrangeWeb.Presence` (no table, no migration) and their
+    positions are clamped, not simulated. Never trust a hub position for
+    gameplay decisions.
+31. **Farms are not hubs.** `FarmMapScene` does not extend `WalkingScene` and
+    must never join `hub:*`; only scenes that pass `hubArea` are multiplayer.
+32. **One avatar per account.** Hub presence is keyed by username; a second tab
+    adds another meta, and the client renders only the newest `at`. Don't switch
+    to a per-socket key without updating `hubClient.readPeers`.
+33. **Remote avatars are visual only.** They are not in `walkCollisions` or
+    `sceneObstacles`; players walk through each other by design.
 
 ---
 
@@ -1030,6 +1075,12 @@ them silently as part of an unrelated change; mention them in the PR.
   synced.
 - The farm’s rendered field is a small patch, but the server accepts a 15×15
   action area.
+- Hub avatars do not collide with each other or with the local player.
+- Hub movement is sent at ~10 Hz and eased client-side, so remote players can
+  appear slightly behind their true position; there is no interpolation buffer
+  or lag compensation.
+- Hub presence is per area: a player in the casino is invisible to players in
+  the marketplace, and players on their farms are in no hub at all.
 
 ---
 
@@ -1037,6 +1088,7 @@ them silently as part of an unrelated change; mention them in the PR.
 
 - `README.md` — setup, database location, tests, deploy.
 - `notes/farming-mechanics.md` — crop/mechanic reference and asset mapping.
+- `notes/hub-multiplayer.md` — hub channel, presence, rendering, tuning.
 - `notes/change-policy.md` — branch/PR/review policy.
 - `notes/WireFrameLayout.md` — HUD/menu/inventory layout intent.
 - `notes/GameDesignNotes.md` — high-level game direction.

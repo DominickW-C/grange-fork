@@ -137,22 +137,52 @@ export async function walkToSeedMarket(
 	await walkUntilPrompt(page, ["a"], "enter the seed market", timeout);
 }
 
-/** Walks from the farm spawn through the marketplace and into the casino. */
-export async function walkToCasino(page: Page): Promise<void> {
+/** Walks from the farm spawn onto the marketplace platform. */
+export async function enterMarketplace(page: Page): Promise<void> {
 	const canvas = page.locator("canvas");
-	const prompt = page.getByTestId("travel-prompt");
 
-	await page.keyboard.down("d");
-	await page.waitForTimeout(1_000);
-	await page.keyboard.up("d");
-	await expect(prompt).toContainText("travel to the marketplace");
+	// Keep walking instead of holding for a fixed time: Excalibur clamps large
+	// frame deltas, so a timed hold covers less ground on a busy machine.
+	await walkUntilPrompt(page, ["d"], "travel to the marketplace");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
 	await waitForTrainStop(page);
+}
+
+/** Walks from the farm spawn through the marketplace and into the casino. */
+export async function walkToCasino(page: Page): Promise<void> {
+	const canvas = page.locator("canvas");
+
+	await enterMarketplace(page);
 
 	await walkUntilPrompt(page, ["w"], "enter the casino");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
+}
+
+/** Waits until the player's hub area lists `name` as another player. */
+export async function waitForHubPeer(page: Page, name: string): Promise<void> {
+	await expect
+		.poll(async () => hubPeerList(page), { timeout: 10_000 })
+		.toContain(name);
+}
+
+/** Waits until the player's hub area no longer lists `name`. */
+export async function waitForHubPeerGone(
+	page: Page,
+	name: string,
+): Promise<void> {
+	await expect
+		.poll(async () => hubPeerList(page), { timeout: 10_000 })
+		.not.toContain(name);
+}
+
+/** The comma-separated peer names the world exposes for tests. */
+export async function hubPeerList(page: Page): Promise<string> {
+	const value = await page
+		.locator(".farm-map-page")
+		.getAttribute("data-hub-peers");
+	return value ?? "";
 }
 
 /**

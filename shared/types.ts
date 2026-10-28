@@ -6,6 +6,16 @@ export interface Player {
 	name: string;
 }
 
+/** The shared, multiplayer areas of the hub world. Farms are not hubs. */
+export type HubArea = "marketplace" | "casino";
+
+/** Another player standing in the same hub area. */
+export interface HubPeer {
+	name: string;
+	x: number;
+	y: number;
+}
+
 /** One tile of a farm's field, as sent by the server. */
 export interface FarmTile {
 	x: number;
@@ -40,7 +50,13 @@ export interface ActiveFarm {
 	fence_count: number;
 	gates: FenceGate[];
 	gate_count: number;
-	prop_overrides: Array<{ index: number; asset: string; x: number; y: number; carried: boolean }>;
+	prop_overrides: Array<{
+		index: number;
+		asset: string;
+		x: number;
+		y: number;
+		carried: boolean;
+	}>;
 	prop_inventory: Record<string, number>;
 }
 

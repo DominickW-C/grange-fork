@@ -21,6 +21,7 @@ import { FarmMapScene } from "./FarmMapScene";
 import { FishingOverlay } from "./FishingOverlay";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
+import { leaveHub, subscribeHubPeers } from "./hubClient";
 import { MarketplaceScene } from "./MarketplaceScene";
 import { MarketWindow } from "./MarketWindow";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
@@ -95,11 +96,26 @@ export default function FarmMap() {
 	}, [selectedHotbar]);
 
 	useEffect(() => {
-		if (heldItem === "fence") pushNotice("Hold left mouse to preview a fence; release on green to place.", "system");
-		if (heldItem === "gate") pushNotice("Gate: click clear grass to place. Press E nearby to open or close.", "system");
-		if (heldItem === "shovel") pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
+		if (heldItem === "fence")
+			pushNotice(
+				"Hold left mouse to preview a fence; release on green to place.",
+				"system",
+			);
+		if (heldItem === "gate")
+			pushNotice(
+				"Gate: click clear grass to place. Press E nearby to open or close.",
+				"system",
+			);
+		if (heldItem === "shovel")
+			pushNotice(
+				"Shovel: click a fence or farm object to dig it up.",
+				"system",
+			);
 		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
-			pushNotice(`Hold left mouse to preview ${heldItem}; release on green to place.`, "system");
+			pushNotice(
+				`Hold left mouse to preview ${heldItem}; release on green to place.`,
+				"system",
+			);
 	}, [heldItem, pushNotice]);
 
 	const fenceCount = farm?.fence_count;
@@ -124,9 +140,18 @@ export default function FarmMap() {
 
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
-	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(null);
+	const [hubPeers, setHubPeers] = useState<string[]>([]);
+	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(
+		null,
+	);
 	const [fishingOpen, setFishingOpen] = useState(false);
 	const [engineReady, setEngineReady] = useState(false);
+
+	// Names only change on join/leave, so this does not re-render per frame.
+	useEffect(() => subscribeHubPeers(setHubPeers), []);
+
+	// The scenes leave the hub when they deactivate; this covers unmounts.
+	useEffect(() => () => leaveHub(), []);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -144,10 +169,16 @@ export default function FarmMap() {
 			backgroundColor: ex.Color.fromHex("#79a44d"),
 		});
 
-		const scene = new FarmMapScene(target, isOwner, setTravelPrompt, setArea, () => {
-			scene.setOverlayPaused(true);
-			setFishingOpen(true);
-		});
+		const scene = new FarmMapScene(
+			target,
+			isOwner,
+			setTravelPrompt,
+			setArea,
+			() => {
+				scene.setOverlayPaused(true);
+				setFishingOpen(true);
+			},
+		);
 		scene.onFarmUpdate = (snapshot) => {
 			if (cancelled) return;
 			setHud(snapshot);
@@ -240,6 +271,7 @@ export default function FarmMap() {
 		<main
 			className="farm-map-page"
 			data-world-ready={worldReady ? "true" : "false"}
+			data-hub-peers={hubPeers.join(",")}
 		>
 			<canvas
 				ref={canvasRef}
