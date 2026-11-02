@@ -14,8 +14,8 @@ import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { updateWalkingPlayer } from "./playerMovement";
 import type { WalkObstacle } from "./walkCollisions";
 
-export type WorldArea = "Farm" | "Marketplace" | "Casino";
-export type WorldSceneName = "farm-map" | "marketplace" | "casino";
+export type WorldArea = "Farm" | "Marketplace" | "Casino" | "Livestock Market" | "Bank";
+export type WorldSceneName = "farm-map" | "marketplace" | "casino" | "livestock-market" | "bank";
 
 export interface SceneSpawn {
 	x: number;
@@ -55,6 +55,7 @@ interface WalkingSceneOptions {
 	hubArea?: HubArea | null;
 	onAreaChange: (area: WorldArea) => void;
 	onPromptChange: (prompt: string | null) => void;
+	worldWidth?: number;
 }
 
 export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
@@ -144,7 +145,11 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			this.playerSpeed,
 			delta,
 			this.options.obstacles,
+			this.options.worldWidth,
 		);
+		if (this.options.worldWidth && this.options.worldWidth > MAP_WIDTH)
+			this.camera.pos = ex.vec(ex.clamp(this.player.pos.x, MAP_WIDTH / 2,
+				this.options.worldWidth - MAP_WIDTH / 2), MAP_HEIGHT / 2);
 		updateFarmerGraphics(this.player, direction);
 		if (this.options.hubArea) {
 			publishHubPosition(this.player.pos.x, this.player.pos.y);
