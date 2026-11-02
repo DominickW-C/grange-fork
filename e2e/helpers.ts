@@ -3,6 +3,15 @@ import { MAP_COLUMNS, MAP_ROWS } from "../src/world/mapData";
 
 export const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3201";
 
+/**
+ * Budget for a train ride, which is not a fixed wall-clock cost. The departure
+ * and arrival animations run on Excalibur's game clock, and that clock counts
+ * any frame longer than 200ms as 1ms, so a busy runner can stretch a 2s
+ * animation well past Playwright's 5s default. Hub tests run two engines at
+ * once, which is exactly when this bites.
+ */
+export const TRAVEL_TIMEOUT = 30_000;
+
 /** Unique suffix so tests don't collide with each other or prior runs. */
 export function uniqueName(base: string): string {
 	return `${base}-${Math.floor(Math.random() * 1e9)}`;
@@ -113,9 +122,13 @@ export async function walkUntilPrompt(
 
 /** Waits for the arriving train to park so the player can move again. The
  * marketplace spawn sits beside the train, so its prompt appears once idle. */
-export async function waitForTrainStop(page: Page): Promise<void> {
+export async function waitForTrainStop(
+	page: Page,
+	timeout = TRAVEL_TIMEOUT,
+): Promise<void> {
 	await expect(page.getByTestId("travel-prompt")).toContainText(
 		"return to the farm",
+		{ timeout },
 	);
 }
 
@@ -141,11 +154,24 @@ export async function walkToSeedMarket(
 export async function enterMarketplace(page: Page): Promise<void> {
 	const canvas = page.locator("canvas");
 
+	// Hub specs drive two pages, so make sure this one owns the keyboard before
+	// walking (Playwright's guidance for multi-page tests).
+	await page.bringToFront();
 	// Keep walking instead of holding for a fixed time: Excalibur clamps large
-	// frame deltas, so a timed hold covers less ground on a busy machine.
-	await walkUntilPrompt(page, ["d"], "travel to the marketplace");
+	// frame deltas, so a timed hold covers less ground on a busy machine. The
+	// same clamping slows the walk itself, so it gets the travel budget too.
+	await walkUntilPrompt(
+		page,
+		["d"],
+		"travel to the marketplace",
+		TRAVEL_TIMEOUT,
+	);
 	await page.keyboard.press("e");
-	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+	// The scene only switches once the train has finished departing, so allow a
+	// loaded runner plenty of time (see TRAVEL_TIMEOUT).
+	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
+		timeout: TRAVEL_TIMEOUT,
+	});
 	await waitForTrainStop(page);
 }
 
@@ -155,9 +181,11 @@ export async function walkToCasino(page: Page): Promise<void> {
 
 	await enterMarketplace(page);
 
-	await walkUntilPrompt(page, ["w"], "enter the casino");
+	await walkUntilPrompt(page, ["w"], "enter the casino", TRAVEL_TIMEOUT);
 	await page.keyboard.press("e");
-	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
+	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/, {
+		timeout: TRAVEL_TIMEOUT,
+	});
 }
 
 /** Waits until the player's hub area lists `name` as another player. */

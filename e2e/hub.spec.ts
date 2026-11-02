@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+	TRAVEL_TIMEOUT,
 	enterMarketplace,
 	hubPeerList,
 	register,
@@ -59,22 +60,26 @@ test("the casino shows players in the casino, not the marketplace", async ({
 		await waitForHubPeer(alice, bobName);
 
 		// Bob leaves for the casino; he disappears from the marketplace.
+		await bob.bringToFront();
 		await walkUntilPrompt(bob, ["w"], "enter the casino");
 		await bob.keyboard.press("e");
 		await expect(bob.locator("canvas")).toHaveAttribute(
 			"aria-label",
 			/^Casino map/,
+			{ timeout: TRAVEL_TIMEOUT },
 		);
 
 		await waitForHubPeerGone(alice, bobName);
 		expect(await hubPeerList(bob)).toBe("");
 
 		// Alice joins him and both are visible in the casino.
+		await alice.bringToFront();
 		await walkUntilPrompt(alice, ["w"], "enter the casino");
 		await alice.keyboard.press("e");
 		await expect(alice.locator("canvas")).toHaveAttribute(
 			"aria-label",
 			/^Casino map/,
+			{ timeout: TRAVEL_TIMEOUT },
 		);
 
 		await waitForHubPeer(alice, bobName);

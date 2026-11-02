@@ -808,6 +808,11 @@ reason (the repo already has one for a deliberate hook dependency).
 - Tile interactions use `clickFarmTile` / `hoverFarmTile`, which map tile
   coordinates to page pixels using `MAP_COLUMNS`/`MAP_ROWS`.
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid.
+- Train rides cost **game** time, not wall-clock time: Excalibur's clock counts
+  any frame longer than 200ms as 1ms, so a loaded runner can stretch the 2s
+  departure/arrival animation well past Playwright's 5s default. Scene-change
+  assertions after a ride use `TRAVEL_TIMEOUT` (30s); do not leave them at the
+  default, especially in tests that run two engines (hub specs).
 - Hub tests use two browser contexts (`browser.newContext()`) and
   `waitForHubPeer`/`waitForHubPeerGone`, which read the `data-hub-peers`
   attribute exposed by `FarmMap`.

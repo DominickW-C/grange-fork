@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+	TRAVEL_TIMEOUT,
 	register,
 	resetServer,
 	uniqueName,
@@ -21,7 +22,9 @@ test("the poker table opens a playable sub-screen", async ({ page }) => {
 	await page.keyboard.up("d");
 	await expect(prompt).toContainText("travel to the marketplace");
 	await page.keyboard.press("e");
-	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
+		timeout: TRAVEL_TIMEOUT,
+	});
 	await waitForTrainStop(page);
 
 	// Marketplace -> casino.
