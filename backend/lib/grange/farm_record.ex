@@ -16,6 +16,8 @@ defmodule Grange.FarmRecord do
     field(:gate_count, :integer, default: 2)
     field(:animals, :map, default: %{})
     field(:land_level, :integer, default: 0)
+    field(:is_public, :boolean, default: false)
+    field(:visitor_edit, :boolean, default: false)
     has_many(:tiles, Grange.Tile, foreign_key: :owner, references: :owner)
     has_many(:barn_items, Grange.BarnItem, foreign_key: :owner, references: :owner)
     timestamps(type: :utc_datetime_usec)
@@ -28,6 +30,8 @@ defmodule Grange.FarmRecord do
           gate_count: non_neg_integer(),
           animals: %{optional(String.t()) => non_neg_integer()},
           land_level: non_neg_integer(),
+          is_public: boolean(),
+          visitor_edit: boolean(),
           tiles: [Grange.Tile.t()] | Ecto.Association.NotLoaded.t(),
           barn_items: [Grange.BarnItem.t()] | Ecto.Association.NotLoaded.t(),
           inserted_at: DateTime.t() | nil,

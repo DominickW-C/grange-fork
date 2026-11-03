@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { depthForY } from "./depth";
 import { addFarmerGraphics } from "./farmerSprite";
 import { FARM_PLAYER_SPAWN, farmBounds, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from "./mapData";
 
@@ -8,7 +9,7 @@ export function createFarmPlayer(scene: ex.Scene): ex.Actor {
 		width: 32,
 		height: 32,
 		anchor: ex.vec(0.5, 1),
-		z: 200,
+		z: depthForY(FARM_PLAYER_SPAWN.y),
 	});
 	addFarmerGraphics(player);
 	scene.add(player);

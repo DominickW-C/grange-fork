@@ -1,5 +1,6 @@
 import * as ex from "excalibur";
 import type { InputVector } from "./InputManager";
+import { depthForY } from "./depth";
 import { farmBounds, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from "./mapData";
 import { farmWalkObstacles } from "./sceneObstacles";
 import { moveAroundObstacles, type WalkObstacle } from "./walkCollisions";
@@ -48,5 +49,5 @@ export function updateWalkingPlayer(
 	player.vel = ex.Vector.Zero;
 	player.pos.x = ex.clamp(next.x, worldMinX + 16, worldWidth - 16);
 	player.pos.y = ex.clamp(next.y, worldMinY + 32, worldHeight - 16);
-	player.z = 100 + Math.floor(player.pos.y);
+	player.z = depthForY(player.pos.y);
 }

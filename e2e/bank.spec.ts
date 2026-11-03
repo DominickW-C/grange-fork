@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName, waitForTrainStop, walkUntilPrompt } from "./helpers";
+import { register, resetServer, rideTrain, uniqueName, waitForTrainStop, walkUntilPrompt } from "./helpers";
 
 test("the bank has teller and mayor desks, with saved money and land purchases", async ({ page }) => {
 	await resetServer();
@@ -8,7 +8,8 @@ test("the bank has teller and mayor desks, with saved money and land purchases",
 	await page.keyboard.down("d");
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
-	await page.keyboard.press("e");
+	await expect(page.getByTestId("travel-prompt")).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
 	await waitForTrainStop(page);
 	await walkUntilPrompt(page, ["d"], "enter the bank", 15_000);

@@ -1,6 +1,7 @@
 import * as ex from "excalibur";
 import type { HubArea } from "../../shared/types";
 import { useGameStore } from "../store";
+import { depthForY } from "./depth";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import {
 	getHubPeers,
@@ -77,7 +78,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			width: 32,
 			height: 32,
 			anchor: ex.vec(0.5, 1),
-			z: 200,
+			z: depthForY(this.options.spawn.y),
 		});
 		addFarmerGraphics(this.player);
 		this.add(this.player);

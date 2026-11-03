@@ -1,14 +1,11 @@
 import * as ex from "excalibur";
 import type { HubPeer } from "../../shared/types";
+import { depthForY } from "./depth";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import { remoteDirection, remoteStep, shouldSnap } from "./hubInterpolation";
 
 /** Space between the avatar's feet and the bottom of its name label. */
 const LABEL_OFFSET_Y = 70;
-
-/** Same layer as the local farmer, so all farmers draw together. */
-const AVATAR_Z = 200;
-const LABEL_Z = AVATAR_Z + 1;
 
 interface RemoteAvatar {
 	actor: ex.Actor;
@@ -34,7 +31,7 @@ export class HubPlayers {
 	) {
 		this.selfLabel = createLabel(localName);
 		scene.add(this.selfLabel);
-		this.placeLabel(this.selfLabel, local.pos);
+		this.placeLabel(this.selfLabel, local.pos, local.z);
 	}
 
 	/** Matches the rendered avatars to the latest presence snapshot. */
@@ -61,7 +58,9 @@ export class HubPlayers {
 
 	/** Eases remotes toward their targets. Call once per frame. */
 	update(deltaMs: number): void {
-		this.placeLabel(this.selfLabel, this.local.pos);
+		this.selfLabel.pos.x = this.local.pos.x;
+		this.selfLabel.pos.y = this.local.pos.y - LABEL_OFFSET_Y;
+		this.selfLabel.z = this.local.z + 1;
 		this.selfLabel.graphics.visible = this.local.graphics.visible;
 
 		for (const remote of this.remotes.values()) {
@@ -73,8 +72,9 @@ export class HubPlayers {
 
 			actor.pos.x = next.x;
 			actor.pos.y = next.y;
+			actor.z = depthForY(next.y);
 			updateFarmerGraphics(actor, remoteDirection(before, next));
-			this.placeLabel(remote.label, actor.pos);
+			this.placeLabel(remote.label, actor.pos, actor.z);
 		}
 	}
 
@@ -93,22 +93,22 @@ export class HubPlayers {
 			width: 32,
 			height: 32,
 			anchor: ex.vec(0.5, 1),
-			z: AVATAR_Z,
+			z: depthForY(peer.y),
 		});
 		addFarmerGraphics(actor);
 		this.scene.add(actor);
 
 		const label = createLabel(peer.name);
 		this.scene.add(label);
-		this.placeLabel(label, actor.pos);
+		this.placeLabel(label, actor.pos, actor.z);
 
 		return { actor, label, target: { x: peer.x, y: peer.y } };
 	}
 
-	private placeLabel(label: ex.Actor, pos: ex.Vector): void {
+	private placeLabel(label: ex.Actor, pos: ex.Vector, z: number): void {
 		label.pos.x = pos.x;
 		label.pos.y = pos.y - LABEL_OFFSET_Y;
-		label.z = LABEL_Z;
+		label.z = z + 1;
 	}
 }
 

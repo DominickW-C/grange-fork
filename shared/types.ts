@@ -49,6 +49,10 @@ export interface ActiveFarm {
 	/** Livestock owned by this farm, keyed by animal species. */
 	animals: Record<string, number>;
 	land_level?: number;
+	/** Whether strangers may join this farm. */
+	is_public: boolean;
+	/** Whether visitors may farm, build fences/gates, and move props. */
+	visitor_edit: boolean;
 	fences: Array<{ x: number; y: number }>;
 	fence_count: number;
 	gates: FenceGate[];
@@ -82,6 +86,8 @@ export interface FarmSummary {
 	watered: number;
 	ready: number;
 	tomatoes: number;
+	/** Whether the farm currently accepts visitors. */
+	is_public: boolean;
 }
 
 /** A player's request to act on a tile of their own farm. */

@@ -123,6 +123,8 @@ export function worldToFieldTile(
 }
 
 export const FARM_PLAYER_SPAWN = { x: 576, y: 620 } as const;
+/** How close the owner must stand to the farmhouse to open its settings. */
+export const FARM_HOUSE_REACH = 120;
 export const FARM_TRAIN_STOP = { x: 810, y: 600 } as const;
 export const FARM_TRAIN_ENGINE_STOP = { x: 1070, y: 600 } as const;
 /** Where the player steps off when arriving at the farm by train: just above

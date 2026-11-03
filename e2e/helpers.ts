@@ -121,15 +121,29 @@ export async function walkUntilPrompt(
 }
 
 /** Waits for the arriving train to park so the player can move again. The
- * marketplace spawn sits beside the train, so its prompt appears once idle. */
+ * spawn sits beside the train, so its boarding prompt appears once idle. */
 export async function waitForTrainStop(
 	page: Page,
 	timeout = TRAVEL_TIMEOUT,
 ): Promise<void> {
 	await expect(page.getByTestId("travel-prompt")).toContainText(
-		"return to the farm",
+		"board the train",
 		{ timeout },
 	);
+}
+
+/**
+ * Boards the parked train and picks a destination from the menu.
+ * `destinationId` is a `TravelDestination.id` such as `marketplace`,
+ * `home`, or `farm-Alice`.
+ */
+export async function rideTrain(
+	page: Page,
+	destinationId: string,
+): Promise<void> {
+	await page.keyboard.press("e");
+	await page.getByTestId("travel-menu").waitFor({ state: "visible" });
+	await page.getByTestId(`travel-option-${destinationId}`).click();
 }
 
 /**
@@ -163,10 +177,10 @@ export async function enterMarketplace(page: Page): Promise<void> {
 	await walkUntilPrompt(
 		page,
 		["d"],
-		"travel to the marketplace",
+		"board the train",
 		TRAVEL_TIMEOUT,
 	);
-	await page.keyboard.press("e");
+	await rideTrain(page, "marketplace");
 	// The scene only switches once the train has finished departing, so allow a
 	// loaded runner plenty of time (see TRAVEL_TIMEOUT).
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
@@ -210,6 +224,31 @@ export async function hubPeerList(page: Page): Promise<string> {
 	const value = await page
 		.locator(".farm-map-page")
 		.getAttribute("data-hub-peers");
+	return value ?? "";
+}
+
+/** Waits until the farm lists `name` as another person standing on it. */
+export async function waitForFarmPeer(page: Page, name: string): Promise<void> {
+	await expect
+		.poll(async () => farmPeerList(page), { timeout: 15_000 })
+		.toContain(name);
+}
+
+/** Waits until a farm no longer lists `name`. */
+export async function waitForFarmPeerGone(
+	page: Page,
+	name: string,
+): Promise<void> {
+	await expect
+		.poll(async () => farmPeerList(page), { timeout: 15_000 })
+		.not.toContain(name);
+}
+
+/** The comma-separated visitor names a farm exposes for tests. */
+export async function farmPeerList(page: Page): Promise<string> {
+	const value = await page
+		.locator(".farm-map-page")
+		.getAttribute("data-farm-peers");
 	return value ?? "";
 }
 

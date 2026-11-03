@@ -7,6 +7,7 @@ import {
 	register,
 	resetServer,
 	uniqueName,
+	walkUntilPrompt,
 } from "./helpers";
 
 async function worldPoint(page: Page, worldX: number, worldY: number) {
@@ -293,6 +294,14 @@ test("a visitor sees another farm read-only but can toggle its gates", async ({ 
 	await page.keyboard.press("5");
 	await clickFarmTile(page, 8, 8);
 	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute("data-count", "1");
+
+	// Farms start private, so open this one before signing out.
+	await walkUntilPrompt(page, ["a", "w"], "enter the farmhouse", 20_000);
+	await page.keyboard.press("e");
+	await page.getByTestId("house-visibility-toggle").click();
+	await expect(page.getByTestId("house-visibility-toggle")).toContainText("Public");
+	await page.getByTestId("house-close").click();
+
 	await page.keyboard.press("Escape");
 	await page.getByTestId("logout").click();
 	await page.waitForURL("**/");
@@ -310,7 +319,7 @@ test("a visitor sees another farm read-only but can toggle its gates", async ({ 
 	await page.keyboard.press("6");
 	await clickFarmTile(page, 7, 8);
 	await expect(page.getByTestId("notification-feed")).toContainText(
-		"Visitors can't farm here.",
+		"visitor editing off",
 	);
 });
 

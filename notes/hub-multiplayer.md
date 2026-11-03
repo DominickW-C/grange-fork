@@ -2,8 +2,8 @@
 
 The marketplace and casino are shared spaces. Every signed-in player in the same
 area sees the other players' farmer avatars moving around, with their username
-above their head. Farms are deliberately **not** shared: they stay private and
-single-player, and no farm data is involved here.
+above their head. Farms are **not** hubs: they keep their own per-farm presence
+and visitor rules, documented in `notes/farm-multiplayer.md`.
 
 ## Topics and events
 
@@ -43,7 +43,8 @@ its entries automatically.
    to 10 Hz with a 1.5 px dead-band, then reads `getHubPeers()`.
 4. `src/world/hubPlayers.ts` adds/removes remote actors, eases them toward their
    reported positions (snapping beyond 250 px), and drives the shared farmer
-   walk animation. It also draws the local player's own label.
+   walk animation. Sprites and labels use `depthForY(y)` so they sort with props
+   exactly like the local player. It also draws the local player's own label.
 5. `onDeactivate` clears remote avatars and leaves the channel.
 
 React only sees peer **names** (`subscribeHubPeers`), which change on join/leave,
@@ -63,6 +64,5 @@ not on movement. `FarmMap` exposes them as `data-hub-peers` for e2e tests.
 
 - No player-vs-player collision; avatars can overlap.
 - No chat, emotes, or profile cards.
-- No farm visitors; farms remain single-player.
 - No interest management; everyone in an area receives every presence update.
 - No persistence of player positions across sessions or server restarts.

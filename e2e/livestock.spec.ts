@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName, waitForTrainStop, waitForWorld, walkUntilPrompt } from "./helpers";
+import { register, resetServer, rideTrain, uniqueName, waitForTrainStop, waitForWorld, walkUntilPrompt } from "./helpers";
 
 test("enter the livestock market and buy a pig from its pen", async ({ page }) => {
 	await resetServer();
@@ -10,8 +10,8 @@ test("enter the livestock market and buy a pig from its pen", async ({ page }) =
 	await page.keyboard.down("d");
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
-	await expect(prompt).toContainText("travel to the marketplace");
-	await page.keyboard.press("e");
+	await expect(prompt).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
 	await waitForTrainStop(page);
 

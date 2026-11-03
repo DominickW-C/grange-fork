@@ -4,6 +4,7 @@ import {
 	TRAVEL_TIMEOUT,
 	register,
 	resetServer,
+	rideTrain,
 	uniqueName,
 	waitForTrainStop,
 	walkToSeedMarket,
@@ -52,14 +53,14 @@ test("the train travels between the farm and marketplace", async ({ page }) => {
 	await page.keyboard.up("d");
 
 	const prompt = page.getByTestId("travel-prompt");
-	await expect(prompt).toContainText("travel to the marketplace");
-	await page.keyboard.press("e");
+	await expect(prompt).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
 		timeout: TRAVEL_TIMEOUT,
 	});
 	await waitForTrainStop(page);
-	await page.keyboard.press("e");
+	await rideTrain(page, "home");
 	await expect(canvas).toHaveAttribute("aria-label", /^Farm map/, {
 		timeout: TRAVEL_TIMEOUT,
 	});
@@ -75,8 +76,8 @@ test("the marketplace casino opens and returns outside", async ({ page }) => {
 	await page.keyboard.down("d");
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
-	await expect(prompt).toContainText("travel to the marketplace");
-	await page.keyboard.press("e");
+	await expect(prompt).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
 		timeout: TRAVEL_TIMEOUT,
 	});
@@ -103,8 +104,8 @@ test("the seed market opens a window with a seeds tab", async ({ page }) => {
 	await page.keyboard.down("d");
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
-	await expect(prompt).toContainText("travel to the marketplace");
-	await page.keyboard.press("e");
+	await expect(prompt).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
 		timeout: TRAVEL_TIMEOUT,
 	});
@@ -164,8 +165,8 @@ test("the produce market opens sell, tools, and train tabs", async ({
 	await page.keyboard.down("d");
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
-	await expect(prompt).toContainText("travel to the marketplace");
-	await page.keyboard.press("e");
+	await expect(prompt).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 	await expect(page.locator("canvas")).toHaveAttribute(
 		"aria-label",
 		/^Marketplace map/,
@@ -264,7 +265,8 @@ test("selling a harvested tomato credits the wallet", async ({
 	await page.keyboard.down("d");
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
-	await page.keyboard.press("e");
+	await expect(page.getByTestId("travel-prompt")).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 	await expect(page.locator("canvas")).toHaveAttribute(
 		"aria-label",
 		/^Marketplace map/,
@@ -325,8 +327,8 @@ test("the blackjack table opens a playable sub-screen", async ({ page }) => {
 	await page.keyboard.down("d");
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
-	await expect(prompt).toContainText("travel to the marketplace");
-	await page.keyboard.press("e");
+	await expect(prompt).toContainText("board the train");
+	await rideTrain(page, "marketplace");
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
 		timeout: TRAVEL_TIMEOUT,
 	});

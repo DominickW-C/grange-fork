@@ -1,6 +1,5 @@
 import * as ex from "excalibur";
 import { updateFarmerGraphics } from "./farmerSprite";
-import { FARM_TRAIN_ARRIVAL_SPAWN } from "./mapData";
 import type { MarketId } from "./marketData";
 import {
 	MARKETPLACE_CASINO_ENTRANCE,
@@ -32,6 +31,7 @@ export class MarketplaceScene extends WalkingScene {
 		onPromptChange: (prompt: string | null) => void,
 		onAreaChange: (area: WorldArea) => void,
 		onOpenMarket: (market: MarketId) => void,
+		onOpenTravel: () => void,
 	) {
 		super({
 			area: "Marketplace",
@@ -42,15 +42,9 @@ export class MarketplaceScene extends WalkingScene {
 			interactions: [
 				{
 					position: ex.vec(MARKETPLACE_TRAIN_STOP.x, MARKETPLACE_TRAIN_STOP.y),
-					destination: "farm-map",
-					destinationSpawn: {
-						x: FARM_TRAIN_ARRIVAL_SPAWN.x,
-						y: FARM_TRAIN_ARRIVAL_SPAWN.y,
-					},
-					prompt: "Press E or Enter to return to the farm",
+					prompt: "Press E or Enter to board the train",
 					canInteract: () => this.train?.canBoard() ?? false,
-					trainArriving: true,
-					onTravel: () => this.departTrain(),
+					action: onOpenTravel,
 				},
 				{
 					position: ex.vec(MARKETPLACE_BANK_ENTRANCE.x, MARKETPLACE_BANK_ENTRANCE.y),
@@ -130,10 +124,8 @@ export class MarketplaceScene extends WalkingScene {
 	}
 
 	/** Plays the train's departure, resolving once it has left the screen. */
-	private departTrain(): Promise<void> {
-		return new Promise((resolve) => {
-			if (!this.train) return resolve();
-			this.train.depart(resolve);
-		});
+	async departTrain(): Promise<void> {
+		if (!this.train?.canBoard()) return;
+		await new Promise<void>((resolve) => this.train?.depart(resolve));
 	}
 }
