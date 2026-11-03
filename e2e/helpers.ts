@@ -118,15 +118,50 @@ export async function login(
 	await enterFarm(page);
 }
 
-/** Holds the given movement keys for a fixed time, for geometry legs. */
+/** How often a held walk re-sends its keydown while waiting. */
+const HOLD_REPEAT_MS = 250;
+
+/**
+ * Reads the travel prompt without waiting for it to exist.
+ *
+ * `locator.textContent()` blocks until the element is attached, and the prompt
+ * is only rendered while something is in reach — so polling with the locator
+ * would stall the walk loop (and its timeout) whenever the player is between
+ * prompts. `fallback` keeps the last non-null reading across a navigation.
+ */
+async function readTravelPrompt(
+	page: Page,
+	fallback: string | null,
+): Promise<string | null> {
+	return page
+		.evaluate(() => {
+			const prompt = document.querySelector('[data-testid="travel-prompt"]');
+			return prompt?.textContent ?? null;
+		})
+		.catch(() => fallback);
+}
+
+/**
+ * Presses the movement keys and keeps them held for `ms`.
+ *
+ * The keys are re-sent every `HOLD_REPEAT_MS` because a keydown delivered
+ * while a scene is paused — right after an overlay closes — is dropped, which
+ * would otherwise leave the player standing still for the whole hold.
+ */
 export async function holdKeys(
 	page: Page,
 	keys: string[],
 	ms: number,
 ): Promise<void> {
+	const deadline = Date.now() + ms;
 	for (const key of keys) await page.keyboard.down(key);
 	try {
-		await page.waitForTimeout(ms);
+		for (;;) {
+			const left = deadline - Date.now();
+			if (left <= 0) return;
+			await page.waitForTimeout(Math.min(HOLD_REPEAT_MS, left));
+			for (const key of keys) await page.keyboard.down(key);
+		}
 	} finally {
 		for (const key of keys) await page.keyboard.up(key);
 	}
@@ -135,7 +170,9 @@ export async function holdKeys(
 /**
  * Holds the given movement keys until the travel prompt contains `text`, then
  * releases them. Polling while moving keeps navigation reliable on slow CI
- * runners, where a fixed hold covers less ground than it does locally.
+ * runners, where a fixed hold covers less ground than it does locally, and the
+ * hold is re-asserted so a keydown dropped during a scene transition cannot
+ * strand the player.
  */
 export async function walkUntilPrompt(
 	page: Page,
@@ -143,10 +180,24 @@ export async function walkUntilPrompt(
 	text: string,
 	timeout = 10_000,
 ): Promise<void> {
-	const prompt = page.getByTestId("travel-prompt");
+	const deadline = Date.now() + timeout;
 	for (const key of keys) await page.keyboard.down(key);
 	try {
-		await expect(prompt).toContainText(text, { timeout });
+		let last: string | null = null;
+		for (;;) {
+			// Re-sending the hold is harmless and covers a dropped keydown.
+			for (const key of keys) await page.keyboard.down(key);
+			last = await readTravelPrompt(page, last);
+			if (last?.includes(text)) return;
+			if (Date.now() >= deadline) {
+				throw new Error(
+					`walking with ${JSON.stringify(keys)} never reached ${JSON.stringify(
+						text,
+					)} in ${timeout}ms; the prompt reads ${JSON.stringify(last)}`,
+				);
+			}
+			await page.waitForTimeout(HOLD_REPEAT_MS);
+		}
 	} finally {
 		for (const key of keys) await page.keyboard.up(key);
 	}
@@ -179,18 +230,25 @@ export async function rideTrain(
 }
 
 /**
- * Walks from the marketplace spawn to the seed market door. Heads north first
- * into the clear lane between the shop fronts (bottom y=300) and the stall
- * tops (y~450), then walks straight west until the seed prompt shows. A
- * straight-west walk avoids wedging diagonally into the produce-cart/barrel
- * row and ends stopped inside the prompt radius instead of streaking through
- * it on a diagonal.
+ * Walks from the marketplace spawn to the seed market door.
+ *
+ * The shops share one front row: their fronts stop a northbound player at the
+ * same height, and the lane just below that row runs clear all the way west to
+ * the seed door. So the route is "north until the shop row, then west".
+ *
+ * The casino doorway sits on that row and is the only prompt on the climb, so
+ * its prompt is the anchor that says the player is at the right height; a
+ * short extra hold then puts the player in the lane (the shop fronts dead-end
+ * both movements, so overshooting cannot miss the lane). A single timed north
+ * hold is what used to break: on a loaded runner it covered less ground and
+ * left the player below the lane, wedged on the produce cart.
  */
 export async function walkToSeedMarket(
 	page: Page,
 	timeout = 20_000,
 ): Promise<void> {
-	await holdKeys(page, ["w"], 1_300);
+	await walkUntilPrompt(page, ["w"], "enter the casino", TRAVEL_TIMEOUT);
+	await holdKeys(page, ["w"], 1_500);
 	await walkUntilPrompt(page, ["a"], "enter the seed market", timeout);
 }
 

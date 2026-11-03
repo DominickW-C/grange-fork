@@ -44,7 +44,9 @@ test("farmhouse settings control visitors and farm presence", async ({
 	await registerFast(guest, guestName);
 	await walkUntilPrompt(guest, ["d"], "board the train", TRAVEL_TIMEOUT);
 	await rideTrain(guest, `farm-${ownerName}`);
-	await expect(guest).toHaveURL(new RegExp(`/farms/${ownerName}$`));
+	await expect(guest).toHaveURL(new RegExp(`/farms/${ownerName}$`), {
+		timeout: TRAVEL_TIMEOUT,
+	});
 	await waitForWorld(guest);
 
 	await waitForFarmPeer(guest, ownerName);

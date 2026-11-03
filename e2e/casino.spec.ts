@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+	TRAVEL_TIMEOUT,
 	holdKeys,
 	registerFast,
 	uniqueName,
@@ -19,6 +20,25 @@ test("the casino tables open playable sub-screens", async ({ page }) => {
 
 	await walkToCasino(page);
 
+	// The doorway back out sits just above the spawn: leave, land at the
+	// marketplace's casino door (inside its prompt radius), and walk back in.
+	// Doing it first keeps it to two key presses instead of a long hike back
+	// across the room at the end.
+	await expect(page.getByTestId("travel-prompt")).toContainText(
+		"leave the casino",
+	);
+	await page.keyboard.press("e");
+	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
+		timeout: TRAVEL_TIMEOUT,
+	});
+	await expect(page.getByTestId("travel-prompt")).toContainText(
+		"enter the casino",
+	);
+	await page.keyboard.press("e");
+	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/, {
+		timeout: TRAVEL_TIMEOUT,
+	});
+
 	// Blackjack sits straight down from the casino spawn.
 	await walkUntilPrompt(page, ["s"], "play blackjack");
 	await page.keyboard.press("e");
@@ -33,8 +53,16 @@ test("the casino tables open playable sub-screens", async ({ page }) => {
 	await page.getByTestId("blackjack-close").click();
 	await expect(blackjack).toHaveCount(0);
 	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
+	// The scene resumes (and the prompt returns) once the overlay is gone;
+	// waiting for it keeps the next key press from landing while still paused.
+	await expect(page.getByTestId("travel-prompt")).toContainText(
+		"play blackjack",
+	);
 
-	// Poker is west along the same row of tables.
+	// Poker is west along the table row. Press south first so the player is
+	// pinned against the blackjack table: from there the poker prompt covers a
+	// wide band of the row, while a pass at spawn height would only graze it.
+	await holdKeys(page, ["s"], 2_000);
 	await walkUntilPrompt(page, ["a"], "play poker", 20_000);
 	await page.keyboard.press("e");
 	const poker = page.getByTestId("poker-overlay");
@@ -48,6 +76,7 @@ test("the casino tables open playable sub-screens", async ({ page }) => {
 	).toHaveCount(2);
 	await page.getByTestId("poker-close").click();
 	await expect(poker).toHaveCount(0);
+	await expect(page.getByTestId("travel-prompt")).toContainText("play poker");
 
 	// Roulette is east, past the blackjack table.
 	await walkUntilPrompt(page, ["d"], "play roulette", 20_000);
@@ -74,13 +103,17 @@ test("the casino tables open playable sub-screens", async ({ page }) => {
 	await expect(page.getByTestId("roulette-result")).not.toHaveText("—");
 	await page.getByTestId("roulette-close").click();
 	await expect(roulette).toHaveCount(0);
+	await expect(page.getByTestId("travel-prompt")).toContainText(
+		"play roulette",
+	);
 
-	// Slots run along the bottom wall. Anchor on the blackjack table so the
-	// next step starts from a known column, step west into the aisle between
-	// the poker and blackjack tables, then drop straight south into range.
+	// Slots run along the bottom wall. Anchor on the blackjack table, then walk
+	// south-west: the player slides along the table edges into the corner
+	// between the poker table and the leftmost slot machines, which is inside
+	// the slots radius. Sliding into a corner means overshooting is harmless,
+	// unlike a timed westward step.
 	await walkUntilPrompt(page, ["a"], "play blackjack", 20_000);
-	await holdKeys(page, ["a"], 1_500);
-	await walkUntilPrompt(page, ["s"], "play the slots", 20_000);
+	await walkUntilPrompt(page, ["a", "s"], "play the slots", 30_000);
 	await page.keyboard.press("e");
 	const slots = page.getByTestId("slots-overlay");
 	await expect(slots).toBeVisible();
@@ -123,12 +156,4 @@ test("the casino tables open playable sub-screens", async ({ page }) => {
 	await page.getByTestId("slots-close").click();
 	await expect(slots).toHaveCount(0);
 	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
-
-	// The doorway out of the casino returns to the marketplace.
-	await holdKeys(page, ["w"], 3_000);
-	await walkUntilPrompt(page, ["d"], "leave the casino", 20_000);
-	await page.keyboard.press("e");
-	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
-		timeout: 30_000,
-	});
 });

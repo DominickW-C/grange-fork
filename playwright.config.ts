@@ -9,8 +9,13 @@ export default defineConfig({
 	// so they no longer have to reset the server themselves.
 	globalSetup: "./e2e/global-setup.ts",
 	fullyParallel: true,
-	workers: process.env.CI ? 2 : undefined,
-	timeout: 60_000,
+	// Two workers is the sweet spot: the farm scene is canvas-heavy, and a
+	// faster local machine started at its own core count just saturates the
+	// CPU and makes every walk slower than it would be with two.
+	workers: 2,
+	// Generous per-test budget: scene changes animate in game time, so a loaded
+	// runner needs more than the default 30s on the longest trips.
+	timeout: 90_000,
 	// The CI workflow uploads `playwright-report/`, so always emit the HTML
 	// report (the default list-only reporter never creates it).
 	reporter: [["list"], ["html", { open: "never" }]],

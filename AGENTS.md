@@ -897,6 +897,10 @@ reason (the repo already has one for a deliberate hook dependency).
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid. Use
   `holdKeys` only for short geometry legs between prompts, never as a
   stand-in for "walk until the prompt appears".
+- Both helpers re-send their keydown while they hold, and tests that close an
+  overlay wait for the prompt to return before walking. A keydown delivered
+  while a scene is still paused after a DOM overlay closes is dropped, which
+  otherwise leaves the player standing still until the timeout.
 - Boarding is two steps: the prompt reads `board the train`, then `rideTrain(page,
   destinationId)` presses `E` and clicks `travel-option-<id>` (`marketplace`,
   `home`, `farm-<owner>`).
@@ -915,8 +919,10 @@ reason (the repo already has one for a deliberate hook dependency).
 - e2e runs against the **built** SPA served by Phoenix on port 3201, not Vite.
 - `pnpm test:e2e` runs `vite build` first. If you changed frontend code, do not
   run Playwright without rebuilding.
-- The suite runs `fullyParallel` with 2 workers on CI (`workers: 2`), with a 60s
-  per-test timeout.
+- The suite runs `fullyParallel` with **2 workers everywhere** (`workers: 2`).
+  A faster local machine started at its own core count just saturates the CPU
+  and makes every walk slower than it is with two. The per-test timeout is 90s
+  (the longest paths, like the casino, set their own larger budget).
 
 ### 10.4 CI
 
