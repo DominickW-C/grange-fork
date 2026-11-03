@@ -1,14 +1,12 @@
 import { expect, test } from "@playwright/test";
 import {
 	clickFarmTile,
-	register,
-	resetServer,
+	registerFast,
 	uniqueName,
 } from "./helpers";
 
 test("planted seed counts survive a page refresh", async ({ page }) => {
-	await resetServer();
-	await register(page, uniqueName("Persist"));
+	await registerFast(page, uniqueName("Persist"));
 	await expect(page).toHaveURL(/\/world$/);
 
 	// Hoe and plant one tomato seed.
@@ -32,8 +30,7 @@ test("planted seed counts survive a page refresh", async ({ page }) => {
 test("inventory positions and split stacks survive a page refresh", async ({
 	page,
 }) => {
-	await resetServer();
-	await register(page, uniqueName("Layout"));
+	await registerFast(page, uniqueName("Layout"));
 	await expect(page).toHaveURL(/\/world$/);
 
 	// Swap the watering can into slot 2 (index 1). The seed pouch moves to slot 3.

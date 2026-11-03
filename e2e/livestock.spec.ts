@@ -1,26 +1,34 @@
 import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName, waitForTrainStop, waitForWorld, walkUntilPrompt } from "./helpers";
+import {
+	holdKeys,
+	registerFast,
+	rideTrain,
+	TRAVEL_TIMEOUT,
+	uniqueName,
+	waitForTrainStop,
+	waitForWorld,
+	walkUntilPrompt,
+} from "./helpers";
 
-test("enter the livestock market and buy a pig from its pen", async ({ page }) => {
-	await resetServer();
-	await register(page, uniqueName("Rancher"));
+test("enter the livestock market and buy a pig from its pen", async ({
+	page,
+}) => {
+	await registerFast(page, uniqueName("Rancher"));
 	const canvas = page.locator("canvas.farm-map-canvas");
-	const prompt = page.getByTestId("travel-prompt");
 
-	await page.keyboard.down("d");
-	await page.waitForTimeout(1_000);
-	await page.keyboard.up("d");
-	await expect(prompt).toContainText("travel to the marketplace");
-	await page.keyboard.press("e");
-	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+	await walkUntilPrompt(page, ["d"], "board the train");
+	await rideTrain(page, "marketplace");
+	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
+		timeout: TRAVEL_TIMEOUT,
+	});
 	await waitForTrainStop(page);
 
 	await walkUntilPrompt(page, ["a"], "enter the livestock market");
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Livestock Market map/);
-	await page.keyboard.down("w");
-	await page.waitForTimeout(750);
-	await page.keyboard.up("w");
+
+	// Step into the aisle, then walk east until a pen is in reach.
+	await holdKeys(page, ["w"], 750);
 	await walkUntilPrompt(page, ["d"], "buy a pig");
 	await page.keyboard.press("e");
 
@@ -36,5 +44,7 @@ test("enter the livestock market and buy a pig from its pen", async ({ page }) =
 	await waitForWorld(page);
 	await expect(page.getByTestId("farm-balance")).toContainText("45");
 	await page.getByTestId("open-inventory").click();
-	await expect(page.getByTestId("inventory-panel").locator('[data-item="pig"]')).toHaveCount(1);
+	await expect(
+		page.getByTestId("inventory-panel").locator('[data-item="pig"]'),
+	).toHaveCount(1);
 });

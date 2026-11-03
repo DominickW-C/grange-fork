@@ -1,5 +1,7 @@
 import * as ex from "excalibur";
 import type { InputVector } from "./InputManager";
+import { depthForY } from "./depth";
+import { MAX_FRAME_STEP_MS } from "./frameClock";
 import { farmBounds, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from "./mapData";
 import { farmWalkObstacles } from "./sceneObstacles";
 import { moveAroundObstacles, type WalkObstacle } from "./walkCollisions";
@@ -37,7 +39,7 @@ export function updateWalkingPlayer(
 	worldMinX = 0,
 	worldMinY = 0,
 ): void {
-	const step = (speed * Math.min(delta, 100)) / 1000;
+	const step = (speed * Math.min(delta, MAX_FRAME_STEP_MS)) / 1000;
 	const next = moveAroundObstacles(
 		player.pos.x,
 		player.pos.y,
@@ -48,5 +50,5 @@ export function updateWalkingPlayer(
 	player.vel = ex.Vector.Zero;
 	player.pos.x = ex.clamp(next.x, worldMinX + 16, worldWidth - 16);
 	player.pos.y = ex.clamp(next.y, worldMinY + 32, worldHeight - 16);
-	player.z = 100 + Math.floor(player.pos.y);
+	player.z = depthForY(player.pos.y);
 }

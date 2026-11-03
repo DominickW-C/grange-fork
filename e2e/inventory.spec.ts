@@ -1,17 +1,15 @@
 import { expect, test } from "@playwright/test";
 import {
 	enterFarm,
-	register,
 	registerAccount,
-	resetServer,
+	registerFast,
 	uniqueName,
 } from "./helpers";
 
 test("HUD shows hotbar and prompts with a clear top screen", async ({
 	page,
 }) => {
-	await resetServer();
-	await register(page, uniqueName("Sprout"));
+	await registerFast(page, uniqueName("Sprout"));
 
 	await expect(page.getByTestId("hotbar")).toBeVisible();
 	await expect(page.getByTestId("slot-hotbar-0")).toBeVisible();
@@ -38,8 +36,7 @@ test("HUD shows hotbar and prompts with a clear top screen", async ({
 test("number keys select hotbar slots and I toggles inventory", async ({
 	page,
 }) => {
-	await resetServer();
-	await register(page, uniqueName("Sprout"));
+	await registerFast(page, uniqueName("Sprout"));
 
 	const hotbar = page.getByTestId("hotbar");
 	await expect(hotbar).toBeVisible();
@@ -71,8 +68,7 @@ test("number keys select hotbar slots and I toggles inventory", async ({
 test("Grangecoin is a wallet counter, not an inventory item", async ({
 	page,
 }) => {
-	await resetServer();
-	await register(page, uniqueName("Sprout"));
+	await registerFast(page, uniqueName("Sprout"));
 
 	// No Grangecoin occupies inventory slots.
 	await expect(page.getByTestId("hotbar")).toBeVisible();
@@ -90,8 +86,7 @@ test("Grangecoin is a wallet counter, not an inventory item", async ({
 test("shift-click moves a stack between the hotbar and the grid", async ({
 	page,
 }) => {
-	await resetServer();
-	await register(page, uniqueName("Sprout"));
+	await registerFast(page, uniqueName("Sprout"));
 
 	await page.keyboard.press("i");
 	const panel = page.getByTestId("inventory-panel");
@@ -114,8 +109,7 @@ test("shift-click moves a stack between the hotbar and the grid", async ({
 });
 
 test("Escape opens the pause menu and Resume closes it", async ({ page }) => {
-	await resetServer();
-	await register(page, uniqueName("Sprout"));
+	await registerFast(page, uniqueName("Sprout"));
 
 	await expect(page.getByTestId("pause-menu")).toHaveCount(0);
 	await page.keyboard.press("Escape");
@@ -130,7 +124,6 @@ test("Escape opens the pause menu and Resume closes it", async ({ page }) => {
 test("Quit to Main Menu keeps the session and returns to the menu", async ({
 	page,
 }) => {
-	await resetServer();
 	const name = uniqueName("Sprout");
 	await registerAccount(page, name);
 	await enterFarm(page);

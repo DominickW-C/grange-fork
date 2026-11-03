@@ -10,6 +10,8 @@ const farm: ActiveFarm = {
 	tomatoes: 0,
 	barn: {},
 	animals: {},
+	is_public: false,
+	visitor_edit: false,
 	fences: [],
 	fence_count: 1,
 	gates: [],
