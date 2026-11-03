@@ -49,13 +49,14 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 
 	async function buySeed(id: MarketItemId, quantity: number) {
 		const item = MARKET_ITEMS[id];
-		if (!SEED_ITEMS[id] || quantity < 1) return;
+		const count = Math.floor(quantity);
+		if (!SEED_ITEMS[id] || count < 1) return;
 		try {
 			const res = await fetch("/api/inventory/buy", {
 				method: "POST",
 				credentials: "same-origin",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ item: id, quantity }),
+				body: JSON.stringify({ item: id, quantity: count }),
 			});
 			const data = (await res.json()) as {
 				ok: boolean;
@@ -70,7 +71,7 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 			if (typeof data.balance === "number") economy.setBalance(data.balance);
 			if (data.seeds) useInventoryStore.getState().hydrateSeeds(data.seeds);
 			setMarketMessage(
-				`Bought ${quantity} ${item.name} for $${item.price * quantity}.`,
+				`Bought ${count} ${item.name} for $${item.price * count}.`,
 			);
 		} catch {
 			setMarketMessage("Could not reach the market.");
