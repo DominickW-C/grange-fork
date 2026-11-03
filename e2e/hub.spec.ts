@@ -3,8 +3,7 @@ import {
 	TRAVEL_TIMEOUT,
 	enterMarketplace,
 	hubPeerList,
-	register,
-	resetServer,
+	registerFast,
 	uniqueName,
 	waitForHubPeer,
 	waitForHubPeerGone,
@@ -12,7 +11,6 @@ import {
 } from "./helpers";
 
 test("players in the marketplace see each other", async ({ browser }) => {
-	await resetServer();
 	const aliceName = uniqueName("Alice");
 	const bobName = uniqueName("Bob");
 	const aliceContext = await browser.newContext();
@@ -21,8 +19,8 @@ test("players in the marketplace see each other", async ({ browser }) => {
 	const bob = await bobContext.newPage();
 
 	try {
-		await register(alice, aliceName);
-		await register(bob, bobName);
+		await registerFast(alice, aliceName);
+		await registerFast(bob, bobName);
 
 		// Farms stay private: no peers are listed there.
 		expect(await hubPeerList(alice)).toBe("");
@@ -44,7 +42,6 @@ test("players in the marketplace see each other", async ({ browser }) => {
 test("the casino shows players in the casino, not the marketplace", async ({
 	browser,
 }) => {
-	await resetServer();
 	const aliceName = uniqueName("Alice");
 	const bobName = uniqueName("Bob");
 	const aliceContext = await browser.newContext();
@@ -53,8 +50,8 @@ test("the casino shows players in the casino, not the marketplace", async ({
 	const bob = await bobContext.newPage();
 
 	try {
-		await register(alice, aliceName);
-		await register(bob, bobName);
+		await registerFast(alice, aliceName);
+		await registerFast(bob, bobName);
 		await enterMarketplace(alice);
 		await enterMarketplace(bob);
 		await waitForHubPeer(alice, bobName);

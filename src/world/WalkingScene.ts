@@ -3,6 +3,7 @@ import type { HubArea } from "../../shared/types";
 import { useGameStore } from "../store";
 import { depthForY } from "./depth";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
+import { FrameClock } from "./frameClock";
 import {
 	getHubPeers,
 	joinHub,
@@ -67,6 +68,8 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 	private paused = false;
 	private hubPlayers?: HubPlayers;
 	private readonly playerSpeed = 160;
+	/** Wall-clock gameplay step; see `frameClock.ts`. */
+	protected readonly frameClock = new FrameClock();
 
 	constructor(private readonly options: WalkingSceneOptions) {
 		super();
@@ -99,6 +102,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.inputManager = new InputManager();
 		this.traveling = false;
 		this.paused = false;
+		this.frameClock.reset();
 		this.options.onAreaChange(this.options.area);
 		this.setPrompt(null);
 		if (this.options.hubArea) {
@@ -128,9 +132,18 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.hubPlayers?.update(delta);
 	}
 
-	override onPreUpdate(engine: ex.Engine, delta: number): void {
+	override onPreUpdate(engine: ex.Engine, _delta: number): void {
+		this.walkFrame(engine, this.frameClock.step());
+	}
+
+	/**
+	 * Runs one walking frame with a wall-clock step. Split out so a subclass
+	 * that also animates something (the marketplace train) can take a single
+	 * step for the frame instead of advancing each concern separately.
+	 */
+	protected walkFrame(engine: ex.Engine, step: number): void {
 		// Other players keep moving while a DOM overlay pauses the local player.
-		this.updateHub(delta);
+		this.updateHub(step);
 
 		if (!this.inputManager || this.paused) return;
 		// Freeze the player while a travel animation (the train leaving) plays.
@@ -144,7 +157,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			this.player,
 			direction,
 			this.playerSpeed,
-			delta,
+			step,
 			this.options.obstacles,
 			this.options.worldWidth,
 		);

@@ -819,6 +819,11 @@ train destination menu. They are hidden, not shown as locked rows.
   `data-testid` values; e2e depends on them.
 - Freeze the scene and hide/freeze the player while a DOM overlay owns input.
 - Load order matters: resources → `engine.start()` → `goToScene`.
+- Drive movement, collision steps, and train animation with `FrameClock`
+  (`src/world/frameClock.ts`), not the `delta` argument. Excalibur replaces any
+  frame longer than 200ms with 1ms, which puts the world into slow motion on a
+  loaded machine; `FrameClock` reports the real wall-clock step (capped at
+  100ms) and is identical to `delta` at normal frame rates.
 
 ### 9.4 Elixir
 
@@ -879,32 +884,39 @@ reason (the repo already has one for a deliberate hook dependency).
 ### 10.3 E2E (Playwright)
 
 - Specs live in `e2e/`; shared helpers in `e2e/helpers.ts`.
-- Every test starts with `resetServer()` (`POST /api/reset`) and registers a
-  unique account (`uniqueName`).
-- `registerAccount` leaves the page on the main menu; `register`/`enterFarm`
-  continue into `/world`.
-- `waitForWorld` waits for the canvas and `[data-world-ready="true"]`.
+- Accounts are wiped once per run by `e2e/global-setup.ts` (`POST /api/reset`).
+  Tests do **not** reset the server themselves: they register a unique account
+  (`uniqueName`) instead, which is what lets the suite run in parallel.
+- Use `registerFast` (auth API + `goto('/world')`) unless the test is about the
+  login form itself; only `auth.spec.ts` drives the UI registration flow
+  (`registerAccount` / `register`).
+- `waitForWorld` waits for the canvas and `[data-world-ready="true"]`. Do not
+  add `waitForLoadState("networkidle")` — it is slower and redundant.
 - Tile interactions use `clickFarmTile` / `hoverFarmTile`, which map tile
   coordinates to page pixels using `MAP_COLUMNS`/`MAP_ROWS`.
-- Walking tests use `walkUntilPrompt` and the `travel-prompt` testid.
+- Walking tests use `walkUntilPrompt` and the `travel-prompt` testid. Use
+  `holdKeys` only for short geometry legs between prompts, never as a
+  stand-in for "walk until the prompt appears".
 - Boarding is two steps: the prompt reads `board the train`, then `rideTrain(page,
   destinationId)` presses `E` and clicks `travel-option-<id>` (`marketplace`,
   `home`, `farm-<owner>`).
-- Train rides cost **game** time, not wall-clock time: Excalibur's clock counts
-  any frame longer than 200ms as 1ms, so a loaded runner can stretch the 2s
-  departure/arrival animation well past Playwright's 5s default. Scene-change
-  assertions after a ride use `TRAVEL_TIMEOUT` (30s); do not leave them at the
-  default, especially in tests that run two engines (hub specs).
+- Trains, overlays, and hub easing still cost real time on a busy runner, so
+  scene-change assertions after a ride use `TRAVEL_TIMEOUT` (30s) instead of
+  Playwright's 5s default.
 - Hub tests use two browser contexts (`browser.newContext()`) and
   `waitForHubPeer`/`waitForHubPeerGone`, which read the `data-hub-peers`
   attribute exposed by `FarmMap`.
 - Farm multiplayer tests use the same two-context pattern plus
   `waitForFarmPeer`/`waitForFarmPeerGone` (`data-farm-peers`) and the
   `house-menu` / `house-visibility-toggle` / `house-edit-toggle` testids.
+- One spec file per feature, not per overlay: `casino.spec.ts` visits the
+  casino once and exercises all four tables instead of re-walking the world in
+  four files.
 - e2e runs against the **built** SPA served by Phoenix on port 3201, not Vite.
 - `pnpm test:e2e` runs `vite build` first. If you changed frontend code, do not
   run Playwright without rebuilding.
-- Tests are serial (`workers: 1`), with a 60s per-test timeout.
+- The suite runs `fullyParallel` with 2 workers on CI (`workers: 2`), with a 60s
+  per-test timeout.
 
 ### 10.4 CI
 
@@ -1135,6 +1147,13 @@ runs Gitleaks.
 37. **Visitor actions are actor-aware.** Seeds and mutation drops belong to the
     acting user; harvested produce belongs to the farm owner. Do not collapse
     actor and owner when adding a new action.
+38. **Never use Excalibur's `delta` for gameplay timing.** The engine clock
+    rewrites any frame longer than 200ms to 1ms, so a starved browser plays in
+    slow motion (a 2s train ride or a walk across the farm can take minutes).
+    `FrameClock` from `src/world/frameClock.ts` reports the real wall-clock step
+    capped at 100ms and is identical to `delta` at normal frame rates. Take one
+    step per `onPreUpdate` and pass it down; do not call `step()` twice in a
+    frame.
 
 ---
 

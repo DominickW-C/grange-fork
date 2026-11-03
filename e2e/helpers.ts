@@ -4,22 +4,16 @@ import { MAP_COLUMNS, MAP_ROWS } from "../src/world/mapData";
 export const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3201";
 
 /**
- * Budget for a train ride, which is not a fixed wall-clock cost. The departure
- * and arrival animations run on Excalibur's game clock, and that clock counts
- * any frame longer than 200ms as 1ms, so a busy runner can stretch a 2s
- * animation well past Playwright's 5s default. Hub tests run two engines at
- * once, which is exactly when this bites.
+ * Budget for a train ride. Departure and arrival animate for two seconds of
+ * game time, and a loaded runner still takes longer than wall clock to paint
+ * those frames, so a ride gets a generous budget instead of Playwright's 5s
+ * default. Scene-change assertions after a ride use this.
  */
 export const TRAVEL_TIMEOUT = 30_000;
 
 /** Unique suffix so tests don't collide with each other or prior runs. */
 export function uniqueName(base: string): string {
 	return `${base}-${Math.floor(Math.random() * 1e9)}`;
-}
-
-/** Resets the server's in-memory state so each test starts clean. */
-export async function resetServer(): Promise<void> {
-	await fetch(`${BASE}/api/reset`, { method: "POST" });
 }
 
 /**
@@ -29,7 +23,6 @@ export async function resetServer(): Promise<void> {
  */
 export async function waitForWorld(page: Page): Promise<void> {
 	await page.locator("canvas.farm-map-canvas").waitFor({ state: "visible" });
-	await page.waitForLoadState("networkidle");
 	// The Excalibur engine starts asynchronously after the canvas mounts, so
 	// wait for the world to report that it is actually interactive before any
 	// keyboard-driven test acts on it.
@@ -80,6 +73,32 @@ export async function register(
 	return username;
 }
 
+/**
+ * Registers through the auth API and lands on the farm map.
+ *
+ * `page.request` shares the context's cookie jar, so the session cookie set by
+ * the response belongs to the page; the next navigation resolves it and the
+ * socket handshake picks up the token. Use the UI `register` in auth tests —
+ * everything else only needs an account, and the form costs a second per test.
+ */
+export async function registerFast(
+	page: Page,
+	username: string,
+	password = "harvest-please",
+): Promise<string> {
+	const response = await page.request.post(`${BASE}/api/auth/register`, {
+		data: { username, email: `${username}@example.test`, password },
+	});
+	if (!response.ok()) {
+		throw new Error(
+			`registering ${username} failed: ${response.status()} ${await response.text()}`,
+		);
+	}
+	await page.goto(`${BASE}/world`);
+	await waitForWorld(page);
+	return username;
+}
+
 /** Registers an account then signs in, leaving the page on the farm map. */
 export async function login(
 	page: Page,
@@ -99,11 +118,24 @@ export async function login(
 	await enterFarm(page);
 }
 
+/** Holds the given movement keys for a fixed time, for geometry legs. */
+export async function holdKeys(
+	page: Page,
+	keys: string[],
+	ms: number,
+): Promise<void> {
+	for (const key of keys) await page.keyboard.down(key);
+	try {
+		await page.waitForTimeout(ms);
+	} finally {
+		for (const key of keys) await page.keyboard.up(key);
+	}
+}
+
 /**
  * Holds the given movement keys until the travel prompt contains `text`, then
  * releases them. Polling while moving keeps navigation reliable on slow CI
- * runners: Excalibur clamps per-frame delta, so a fixed hold covers less
- * ground there and the player can stop short of the interaction radius.
+ * runners, where a fixed hold covers less ground than it does locally.
  */
 export async function walkUntilPrompt(
 	page: Page,
@@ -158,9 +190,7 @@ export async function walkToSeedMarket(
 	page: Page,
 	timeout = 20_000,
 ): Promise<void> {
-	await page.keyboard.down("w");
-	await page.waitForTimeout(1_300);
-	await page.keyboard.up("w");
+	await holdKeys(page, ["w"], 1_300);
 	await walkUntilPrompt(page, ["a"], "enter the seed market", timeout);
 }
 
@@ -171,9 +201,9 @@ export async function enterMarketplace(page: Page): Promise<void> {
 	// Hub specs drive two pages, so make sure this one owns the keyboard before
 	// walking (Playwright's guidance for multi-page tests).
 	await page.bringToFront();
-	// Keep walking instead of holding for a fixed time: Excalibur clamps large
-	// frame deltas, so a timed hold covers less ground on a busy machine. The
-	// same clamping slows the walk itself, so it gets the travel budget too.
+	// Keep walking until the prompt appears rather than holding for a fixed
+	// time: the map is wide, and a busy runner paints fewer frames per second,
+	// so a timed hold covers less ground there than it does locally.
 	await walkUntilPrompt(
 		page,
 		["d"],

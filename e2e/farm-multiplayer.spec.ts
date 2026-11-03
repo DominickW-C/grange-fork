@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
 	BASE,
+	TRAVEL_TIMEOUT,
 	clickFarmTile,
-	register,
-	resetServer,
+	registerFast,
 	rideTrain,
 	uniqueName,
 	waitForFarmPeer,
@@ -15,7 +15,6 @@ test("farmhouse settings control visitors and farm presence", async ({
 	browser,
 }) => {
 	test.setTimeout(120_000);
-	await resetServer();
 	const ownerName = uniqueName("Owner");
 	const guestName = uniqueName("Guest");
 
@@ -24,7 +23,7 @@ test("farmhouse settings control visitors and farm presence", async ({
 	const owner = await ownerContext.newPage();
 	const guest = await guestContext.newPage();
 
-	await register(owner, ownerName);
+	await registerFast(owner, ownerName);
 
 	// The owner opens the farmhouse menu by standing beside the house.
 	await walkUntilPrompt(owner, ["a", "w"], "enter the farmhouse", 20_000);
@@ -42,13 +41,8 @@ test("farmhouse settings control visitors and farm presence", async ({
 	await expect(menu).toHaveCount(0);
 
 	// The guest finds the now-public farm in the train menu.
-	await register(guest, guestName);
-	await guest.keyboard.down("d");
-	await guest.waitForTimeout(1_000);
-	await guest.keyboard.up("d");
-	await expect(guest.getByTestId("travel-prompt")).toContainText(
-		"board the train",
-	);
+	await registerFast(guest, guestName);
+	await walkUntilPrompt(guest, ["d"], "board the train", TRAVEL_TIMEOUT);
 	await rideTrain(guest, `farm-${ownerName}`);
 	await expect(guest).toHaveURL(new RegExp(`/farms/${ownerName}$`));
 	await waitForWorld(guest);

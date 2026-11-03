@@ -5,8 +5,11 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
 	testDir: "e2e",
-	fullyParallel: false,
-	workers: 1,
+	// Accounts are wiped once in `globalSetup`; tests register unique usernames
+	// so they no longer have to reset the server themselves.
+	globalSetup: "./e2e/global-setup.ts",
+	fullyParallel: true,
+	workers: process.env.CI ? 2 : undefined,
 	timeout: 60_000,
 	// The CI workflow uploads `playwright-report/`, so always emit the HTML
 	// report (the default list-only reporter never creates it).

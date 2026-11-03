@@ -9,6 +9,7 @@ import { useComboStore } from "./comboStore";
 import { CropLayer } from "./cropLayer";
 import { FenceLayer } from "./fenceRendering";
 import { FencePlacementPreview } from "./FencePlacementPreview";
+import { FrameClock } from "./frameClock";
 import { selectedFarmItem } from "./fenceActions";
 import { performFarmAction } from "./farmActionRunner";
 import { FarmPropLayer } from "./farmPropLayer";
@@ -67,6 +68,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private train!: TrainController;
 	private presence?: FarmScenePresence;
 	private paused = false;
+	/** Wall-clock gameplay step; see `frameClock.ts`. */
+	private readonly frameClock = new FrameClock();
 
 	constructor(
 		private readonly owner: string,
@@ -155,17 +158,28 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		if (this.deactivated) this.inputManager = new InputManager();
 		this.deactivated = false;
 		this.paused = false;
+		this.frameClock.reset();
 		this.travel.activate();
 		this.train.reset(context.data?.trainArriving ?? false);
 		this.presence?.update(0);
 	}
 
-	override onPreUpdate(_engine: ex.Engine, delta: number): void {
-		if (this.placement.active && (isInventoryBlockingInput() ||
-			selectedFarmItem() !== this.placement.selectedAsset)) this.placement.clear();
-		if (this.fencePlacement.active && (isInventoryBlockingInput() ||
-			selectedFarmItem() !== "fence")) this.fencePlacement.clear();
-		this.train.update(delta);
+	override onPreUpdate(_engine: ex.Engine, _delta: number): void {
+		const step = this.frameClock.step();
+		if (
+			this.placement.active &&
+			(isInventoryBlockingInput() ||
+				selectedFarmItem() !== this.placement.selectedAsset)
+		) {
+			this.placement.clear();
+		}
+		if (
+			this.fencePlacement.active &&
+			(isInventoryBlockingInput() || selectedFarmItem() !== "fence")
+		) {
+			this.fencePlacement.clear();
+		}
+		this.train.update(step);
 		this.player.graphics.visible = this.train.isParked();
 		const farm = useGameStore.getState().activeFarm;
 		setFarmLandLevel(farm?.land_level ?? 0);
@@ -176,7 +190,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		}
 		this.farmProps.set(farm?.prop_overrides ?? []);
 		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
-		this.presence?.update(delta);
+		this.presence?.update(step);
 
 		// Freeze and hide the player while the inventory modal captures input,
 		// while a farmhouse/train menu is open, while the fishing overlay is
@@ -193,7 +207,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		}
 
 		const dir = this.inputManager.getMovementVector();
-		updateFarmPlayer(this.player, dir, delta, this.combo.moveSpeed, farm?.land_level ?? 0);
+		updateFarmPlayer(this.player, dir, step, this.combo.moveSpeed, farm?.land_level ?? 0);
 		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0);
 		updateFarmerGraphics(this.player, dir);
 
@@ -216,7 +230,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			(column, row) => this.performAction(column, row));
 		this.syncTilesFromServer();
 		this.tileSync.syncGrowing(useGameStore.getState().activeFarm, Date.now());
-		this.sweepFx.update(delta);
+		this.sweepFx.update(step);
 		this.combo.update();
 	}
 

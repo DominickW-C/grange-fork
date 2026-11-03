@@ -109,18 +109,20 @@ export class MarketplaceScene extends WalkingScene {
 		this.train?.reset(context.data?.trainArriving ?? false);
 	}
 
-	override onPreUpdate(engine: ex.Engine, delta: number): void {
-		this.train?.update(delta);
+	override onPreUpdate(engine: ex.Engine, _delta: number): void {
+		// One wall-clock step for both the train and the walk.
+		const step = this.frameClock.step();
+		this.train?.update(step);
 		if (!(this.train?.isParked() ?? true)) {
 			this.player.graphics.visible = false;
 			this.player.vel = ex.Vector.Zero;
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
 			// Keep the hub live while the local player rides the train.
-			this.updateHub(delta);
+			this.updateHub(step);
 			return;
 		}
 		this.player.graphics.visible = true;
-		super.onPreUpdate(engine, delta);
+		this.walkFrame(engine, step);
 	}
 
 	/** Plays the train's departure, resolving once it has left the screen. */
