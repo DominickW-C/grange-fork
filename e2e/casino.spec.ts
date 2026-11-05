@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
 	expectArea,
+	holdKeys,
 	registerFast,
 	uniqueName,
 	useDoor,
@@ -41,9 +42,13 @@ test("blackjack deals a hand", async ({ page }) => {
 test("poker posts the blinds and deals hole cards", async ({ page }) => {
 	await registerFast(page, uniqueName("Shark"), CASINO);
 
-	// Poker is west along the table row. The diagonal from spawn reaches the
-	// poker radius before the blackjack one.
-	await walkUntilPrompt(page, ["a", "s"], "play poker", 20_000);
+	// Poker is west of the blackjack table, but a diagonal walk slides along the
+	// poker table's right edge just outside its 115px radius. Anchor the height
+	// on the blackjack row first (its table stops the player), then walk west
+	// along that row until the poker radius catches.
+	await walkUntilPrompt(page, ["s"], "play blackjack", 20_000);
+	await holdKeys(page, ["s"], 150);
+	await walkUntilPrompt(page, ["a"], "play poker", 20_000);
 	await useDoor(page);
 
 	const poker = page.getByTestId("poker-overlay");
@@ -78,9 +83,10 @@ test("roulette takes a bet and settles a spin", async ({ page }) => {
 		"5",
 	);
 	await expect(page.getByTestId("roulette-staked")).toContainText("5");
-	// Spin and wait for the wheel to settle into a result.
+	// Spin and wait for the wheel to settle into a result. The transient
+	// "Spinning" label is not asserted: e2e shortens the animation, so the
+	// settled result is the only stable signal.
 	await page.getByTestId("roulette-spin").click();
-	await expect(page.getByTestId("roulette-message")).toContainText("Spinning");
 	await expect(page.getByTestId("roulette-play-again")).toBeVisible({
 		timeout: 8_000,
 	});
@@ -106,7 +112,7 @@ test("slots spin a bet and auto-spin several rounds", async ({ page }) => {
 	await page.getByTestId("slots-bet-50").click();
 	await expect(page.getByTestId("slots-current-bet")).toContainText("50");
 	await page.getByTestId("slots-spin").click();
-	await expect(page.getByTestId("slots-message")).toContainText("Spinning");
+	// The reels settle quickly in e2e; the settled result is the stable signal.
 	await expect(page.getByTestId("slots-play-again")).toBeVisible({
 		timeout: 8_000,
 	});

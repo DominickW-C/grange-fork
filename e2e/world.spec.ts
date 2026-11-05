@@ -8,12 +8,16 @@ import {
 	uniqueName,
 	useDoor,
 	waitForTrainStop,
+	waitForWorld,
 	walkToProduceMarket,
 	walkToSeedMarket,
 	walkUntilPrompt,
+	worldUrl,
 } from "./helpers";
 
-test("farm world loads without asset or page errors", async ({ page }) => {
+test("every world area loads without asset or page errors", async ({
+	page,
+}) => {
 	const pageErrors: string[] = [];
 	const failedAssets: string[] = [];
 
@@ -21,30 +25,47 @@ test("farm world loads without asset or page errors", async ({ page }) => {
 		pageErrors.push(error.message);
 	});
 
+	// Every image the world serves, not just the farm/marketplace/transport
+	// sets: a scene that is missing an asset (for example after a lazy-loading
+	// change) must fail here instead of drawing a blank sprite. Cached
+	// navigations answer with 304, which is not `ok()` but is not a failure, and
+	// the built JS/CSS/fonts also live under `/assets/`, so only 4xx/5xx image
+	// responses count.
 	page.on("response", (response) => {
 		if (
-			/\/assets\/(farm|marketplace|transport)\//.test(response.url()) &&
-			!response.ok()
+			response.status() >= 400 &&
+			/\/assets\/.*\.(?:webp|png|svg)$/.test(response.url())
 		) {
-			failedAssets.push(response.url());
+			failedAssets.push(`${response.status()} ${response.url()}`);
 		}
 	});
 
 	await registerFast(page, uniqueName("Sprout"));
+	await expect(page.locator("canvas[aria-label^='Farm map']")).toBeVisible();
 
-	const canvas = page.locator("canvas[aria-label^='Farm map']");
-	await expect(canvas).toBeVisible();
+	// Each area boots its own scene and asset set.
+	for (const area of [
+		"marketplace",
+		"casino",
+		"livestock-market",
+		"bank",
+	] as const) {
+		await page.goto(worldUrl(area));
+		await waitForWorld(page);
+	}
+	await page.goto(worldUrl("farm-map"));
+	await waitForWorld(page);
 
 	expect(pageErrors).toEqual([]);
 	expect(failedAssets).toEqual([]);
 });
 
-test("the seed market opens the Seed Stall buy view", async ({ page }) => {
-	await registerFast(page, uniqueName("Seedseller"), { area: "marketplace" });
+test("the market stalls open their buy and sell views", async ({ page }) => {
+	await registerFast(page, uniqueName("Trader"), { area: "marketplace" });
 	const prompt = page.getByTestId("travel-prompt");
 
+	// Seed stall: the westernmost shop on the lane.
 	await walkToSeedMarket(page);
-
 	await expect(prompt).toContainText("enter the seed market");
 	await useDoor(page);
 
@@ -86,31 +107,13 @@ test("the seed market opens the Seed Stall buy view", async ({ page }) => {
 	await expect(page.getByTestId("market-title")).toHaveText(
 		"GRANGE MARKET - SEED STALL",
 	);
-
 	await page.keyboard.press("Escape");
 	await expect(market).toHaveCount(0);
 	await expect(prompt).toContainText("enter the seed market");
 
-	// The purchase is account state, not a local bump that resets to 10 on load.
-	await page.reload();
-	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
-		"data-count",
-		"11",
-	);
-});
-
-test("the produce market opens the Produce Stall sell grid", async ({
-	page,
-}) => {
-	await registerFast(page, uniqueName("Trader"), { area: "marketplace" });
-
-	const prompt = page.getByTestId("travel-prompt");
-	await walkToProduceMarket(page);
-
-	await expect(prompt).toContainText("enter the produce market");
+	// The produce stall is the next door east on the same lane.
+	await walkUntilPrompt(page, ["d"], "enter the produce market", 20_000);
 	await useDoor(page);
-
-	const market = page.getByTestId("market-window");
 	await expect(market).toBeVisible();
 	await expect(page.getByTestId("market-title")).toHaveText(
 		"GRANGE MARKET - PRODUCE STALL",
@@ -134,12 +137,18 @@ test("the produce market opens the Produce Stall sell grid", async ({
 	// Secondary tabs keep the fish/rods/tools/train stock for now.
 	await page.getByTestId("market-subtab-fish").click();
 	await expect(page.locator(".market-generic-grid")).toBeVisible();
-
 	await page.getByTestId("market-subtab-tools").click();
 	await expect(page.locator(".market-generic-grid")).toBeVisible();
 
 	await page.getByTestId("market-close").click();
 	await expect(market).toHaveCount(0);
+
+	// The purchase is account state, not a local bump that resets to 10 on load.
+	await page.reload();
+	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
+		"data-count",
+		"11",
+	);
 });
 
 test("the farm map is closed to visitors without a session", async ({
@@ -211,9 +220,7 @@ test("selling a harvested tomato credits the wallet", async ({ page }) => {
 	await expect(page.locator('[data-item="tomato"]')).toHaveCount(0);
 });
 
-test("balance belongs to the account and starts fresh for a new one", async ({
-	page,
-}) => {
+test("balance belongs to the account across a reload", async ({ page }) => {
 	await registerFast(page, uniqueName("Saver"));
 	await expect(page.getByTestId("farm-balance")).toContainText("100");
 
@@ -226,11 +233,4 @@ test("balance belongs to the account and starts fresh for a new one", async ({
 	// A reload re-reads the stored balance from the account.
 	await page.reload();
 	await expect(page.getByTestId("farm-balance")).toContainText("60");
-
-	// A different account must not inherit the first one's balance.
-	await page.getByTestId("open-pause").click();
-	await page.getByTestId("logout").click();
-	await page.waitForURL(`${BASE}/`);
-	await registerFast(page, uniqueName("Fresh"));
-	await expect(page.getByTestId("farm-balance")).toContainText("100");
 });

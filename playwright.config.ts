@@ -33,9 +33,15 @@ export default defineConfig({
 		env: {
 			PORT,
 			MIX_ENV: "dev",
-			// dev.exs turns this into `:grow_ms`. The meta tag the shell injects
-			// in dev also enables the SPA's `?area=` boot and 2x walk speed.
-			GRANGE_GROW_MS: process.env.GRANGE_GROW_MS ?? "500",
+			// dev.exs turns these into `:grow_ms` and the farm tick interval.
+			// Crops ripen in 100ms and the ticker sweeps every 100ms, so a spec
+			// never waits on the 1s production tick. The meta tag the shell
+			// injects in dev also enables the SPA's `?area=` boot and 3x walk
+			// speed.
+			GRANGE_GROW_MS: process.env.GRANGE_GROW_MS ?? "100",
+			GRANGE_TICK_MS: process.env.GRANGE_TICK_MS ?? "100",
+			// Argon2 is deliberately slow in dev; e2e registers ~50 accounts.
+			GRANGE_FAST_HASH: "1",
 		},
 	},
 });

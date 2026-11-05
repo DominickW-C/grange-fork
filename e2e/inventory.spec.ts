@@ -6,7 +6,7 @@ import {
 	uniqueName,
 } from "./helpers";
 
-test("HUD shows hotbar and prompts with a clear top screen", async ({
+test("HUD shows the hotbar and wallet with a clear top screen", async ({
 	page,
 }) => {
 	await registerFast(page, uniqueName("Sprout"));
@@ -32,9 +32,19 @@ test("HUD shows hotbar and prompts with a clear top screen", async ({
 		return hits;
 	});
 	expect(topIntruders).toEqual([]);
+
+	// Grangecoin is a wallet counter, not an inventory item.
+	await page.keyboard.press("i");
+	await expect(page.getByTestId("inventory-panel")).toBeVisible();
+	const coinSlots = page.locator(
+		"[data-testid^='slot-'][data-item='grangecoin']",
+	);
+	await expect(coinSlots).toHaveCount(0);
+	await expect(page.getByTestId("farm-balance")).toContainText("100");
+	await expect(page.getByTestId("preview-coins")).toContainText("100");
 });
 
-test("number keys select hotbar slots and I toggles inventory", async ({
+test("number keys select hotbar slots and stacks move with shift-click", async ({
 	page,
 }) => {
 	await registerFast(page, uniqueName("Sprout"));
@@ -64,38 +74,10 @@ test("number keys select hotbar slots and I toggles inventory", async ({
 	await expect(page.getByTestId("inventory-panel")).toBeVisible();
 	await page.getByTestId("inventory-close").click();
 	await expect(page.getByTestId("inventory-panel")).toHaveCount(0);
-});
-
-test("Grangecoin is a wallet counter, not an inventory item", async ({
-	page,
-}) => {
-	await registerFast(page, uniqueName("Sprout"));
-
-	// No Grangecoin occupies inventory slots.
-	await expect(page.getByTestId("hotbar")).toBeVisible();
-	await page.keyboard.press("i");
-	await expect(page.getByTestId("inventory-panel")).toBeVisible();
-
-	const coinSlots = page.locator(
-		"[data-testid^='slot-'][data-item='grangecoin']",
-	);
-	await expect(coinSlots).toHaveCount(0);
-
-	// The wallet counter is shown instead.
-	await expect(page.getByTestId("farm-balance")).toContainText("100");
-	await expect(page.getByTestId("preview-coins")).toContainText("100");
-});
-
-test("shift-click moves a stack between the hotbar and the grid", async ({
-	page,
-}) => {
-	await registerFast(page, uniqueName("Sprout"));
-
-	await page.keyboard.press("i");
-	const panel = page.getByTestId("inventory-panel");
-	await expect(panel).toBeVisible();
 
 	// Hotbar slot 0 starts with the Hoe and grid slot 0 is empty.
+	await page.keyboard.press("i");
+	await expect(panel).toBeVisible();
 	const hotbarHoe = panel.getByTestId("slot-hotbar-0");
 	await expect(hotbarHoe).toHaveAttribute("data-item", "hoe");
 

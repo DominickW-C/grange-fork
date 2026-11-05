@@ -70,34 +70,3 @@ export async function clickFarmTile(
 	const { x, y } = await farmTilePosition(page, column, row);
 	await page.mouse.click(x, y);
 }
-
-/** Samples a rendered farm tile's center pixel from a canvas screenshot. */
-export async function farmTilePixel(
-	page: Page,
-	column: number,
-	row: number,
-): Promise<{ r: number; g: number; b: number }> {
-	const buf = await page.locator("canvas.farm-map-canvas").screenshot();
-	const b64 = buf.toString("base64");
-	return page.evaluate(
-		async ({ b64, xf, yf }) => {
-			const img = new Image();
-			img.src = `data:image/png;base64,${b64}`;
-			await img.decode();
-			const canvas = document.createElement("canvas");
-			canvas.width = img.width;
-			canvas.height = img.height;
-			const ctx = canvas.getContext("2d");
-			if (!ctx) throw new Error("no 2d context");
-			ctx.drawImage(img, 0, 0);
-			const d = ctx.getImageData(
-				Math.floor(xf * img.width),
-				Math.floor(yf * img.height),
-				1,
-				1,
-			).data;
-			return { r: d[0], g: d[1], b: d[2] };
-		},
-		{ b64, xf: (column + 0.5) / MAP_COLUMNS, yf: (row + 0.5) / MAP_ROWS },
-	);
-}

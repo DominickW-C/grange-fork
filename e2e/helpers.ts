@@ -21,7 +21,6 @@ export {
 export {
 	clickFarmTile,
 	clickWorld,
-	farmTilePixel,
 	farmTilePosition,
 	hoverFarmTile,
 	worldPoint,

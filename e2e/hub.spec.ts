@@ -22,7 +22,15 @@ async function enterMarketplaceHub(page: Page): Promise<void> {
 	await waitForWorld(page);
 }
 
-test("players in the marketplace see each other", async ({ twoPlayers }) => {
+/**
+ * One presence flow: marketplace peers, area separation, and leaving a hub.
+ *
+ * The two halves used to be separate tests, each paying for two accounts and
+ * two world boots. They describe one continuous session, so they share it.
+ */
+test("players share the marketplace, the casino, and their own farms", async ({
+	twoPlayers,
+}) => {
 	const [alice, bob] = await twoPlayers();
 	const aliceName = uniqueName("Alice");
 	const bobName = uniqueName("Bob");
@@ -42,25 +50,6 @@ test("players in the marketplace see each other", async ({ twoPlayers }) => {
 	// The local player is never their own peer.
 	expect(await hubPeerList(alice)).not.toContain(aliceName);
 
-	// Leaving the hub drops the peer from the other screen.
-	await bob.goto(worldUrl());
-	await waitForWorld(bob);
-	await waitForHubPeerGone(alice, bobName);
-});
-
-test("the casino shows players in the casino, not the marketplace", async ({
-	twoPlayers,
-}) => {
-	const [alice, bob] = await twoPlayers();
-	const aliceName = uniqueName("Alice");
-	const bobName = uniqueName("Bob");
-
-	await registerFast(alice, aliceName);
-	await registerFast(bob, bobName);
-	await enterMarketplaceHub(alice);
-	await enterMarketplaceHub(bob);
-	await waitForHubPeer(alice, bobName);
-
 	// Bob leaves for the casino; he disappears from the marketplace.
 	await bob.bringToFront();
 	await walkUntilPrompt(bob, ["w"], "enter the casino");
@@ -78,4 +67,9 @@ test("the casino shows players in the casino, not the marketplace", async ({
 
 	await waitForHubPeer(alice, bobName);
 	await waitForHubPeer(bob, aliceName);
+
+	// Alice returns to her farm, which is not a hub, so Bob loses her.
+	await alice.goto(worldUrl());
+	await waitForWorld(alice);
+	await waitForHubPeerGone(bob, aliceName);
 });

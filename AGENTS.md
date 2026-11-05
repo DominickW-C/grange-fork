@@ -123,6 +123,7 @@ to Phoenix on `:3200`.
 | `pnpm test` | Vitest, all `**/*.test.ts(x)` |
 | `pnpm test:backend` | ExUnit |
 | `pnpm test:e2e` | Builds the SPA, then Playwright against Phoenix |
+| `pnpm test:e2e:run` | Playwright only, no rebuild (used by CI after `check`) |
 | `pnpm test:e2e:install` | Installs Chromium for Playwright |
 | `pnpm lint` | Biome lint + file-size check + repo sanity |
 | `pnpm lint:backend` | `mix format --check-formatted` + `mix credo --strict` |
@@ -397,8 +398,11 @@ animation, and travel to the marketplace.
 
 The Excalibur engine is created as soon as the route has a farm target; the
 world only becomes interactive after the farm channel join supplies
-`activeFarm` (`data-world-ready="true"` requires it). Resources are loaded
-before `engine.start()`, and the scene waits for store updates rather than
+`activeFarm` (`data-world-ready="true"` requires it). Only the boot scene's
+images block the first frame (`worldAssets.ts`): the engine starts once that
+scene can draw, and `preloadWorldResources` warms the other scenes in the
+background. Travel awaits `ensureSceneResources(destination)` so a fast player
+never lands in a blank scene. The scene waits for store updates rather than
 gating engine construction.
 
 DOM overlays (inventory, pause menu, market window, casino game overlays) pause
@@ -487,7 +491,8 @@ not rendered UI.
 │       ├── farmProp* / propLayer / placement previews
 │       ├── marketData / useFarmMarket / MarketWindow
 │       ├── blackjack*, poker*, roulette*, slots* ← client-side casino games
-│       ├── resources.ts / *Resources.ts ← Excalibur image loading
+│       ├── resources.ts / *Resources.ts ← Excalibur image sources
+│       ├── worldAssets.ts     ← per-scene image groups + lazy loading
 │       └── walkCollisions / sceneObstacles / playerMovement / train
 ├── backend/
 │   ├── mix.exs
@@ -846,9 +851,9 @@ the client repaints it as grass.
 ### 9.3 Excalibur
 
 - Scenes extend `ex.Scene` or `WalkingScene`.
-- Register new scenes and resources in `FarmMap.tsx`; add image sources to
-  `resources.ts` (or the scene-specific resource module) **before**
-  `engine.start()`.
+- Register new scenes in `FarmMap.tsx`; add image sources to `resources.ts` (or
+  the scene-specific resource module) and to that scene's group in
+  `worldAssets.ts`, or the image renders blank on the first visit.
 - Use `TILE_SIZE`/`MAP_*` constants; do not hard-code 64/1152/768.
 - Use `BlockRegistry`, `walkCollisions`, and `sceneObstacles` instead of ad-hoc
   collision checks.
@@ -856,7 +861,8 @@ the client repaints it as grass.
   (`"Farm map..."` / `"Marketplace map..."` / `"Casino map..."`), and
   `data-testid` values; e2e depends on them.
 - Freeze the scene and hide/freeze the player while a DOM overlay owns input.
-- Load order matters: resources → `engine.start()` → `goToScene`.
+- Load order matters: the boot scene's images (`ensureSceneResources`) →
+  `engine.start()` → `goToScene`. The rest preload behind the first frame.
 - Drive movement, collision steps, and train animation with `FrameClock`
   (`src/world/frameClock.ts`), not the `delta` argument. Excalibur replaces any
   frame longer than 200ms with 1ms, which puts the world into slow motion on a
@@ -945,11 +951,21 @@ reason (the repo already has one for a deliberate hook dependency).
   `enable_test_routes` is on (the same flag as `/api/reset`), and
   `testMode.ts` reads it. Production never injects it, so `?area=` is ignored
   and walking speed is normal.
-- `webServer.env` in `playwright.config.ts` sets `GRANGE_GROW_MS=500`, which
-  `dev.exs` turns into `Farm.grow_ms/0`: a crop ripens in half a second instead
-  of ten. The same test mode doubles walking speed
-  (`WALK_SPEED_MULTIPLIER` in `playerMovement.ts`), so a timed hold covers
-  twice the ground it used to.
+- `webServer.env` in `playwright.config.ts` runs the suite on a fast clock,
+  all of it e2e-only:
+  - `GRANGE_GROW_MS=100` → `Farm.grow_ms/0`: a crop ripens in 100ms, not 10s.
+  - `GRANGE_TICK_MS=100` → the `FarmTicker` sweep interval, so a watered crop is
+    ready on the next sweep instead of the next second.
+  - `GRANGE_FAST_HASH=1` → the cheap Argon2 parameters `test.exs` uses. The
+    suite registers ~50 accounts, and production hashing is a measurable slice
+    of that.
+  - The test-mode `WALK_SPEED_MULTIPLIER` (in `testMode.ts`) is **3x**, so a
+    `holdKeys` leg covers three times the ground.
+  - Wall-clock animations use `e2eMs(real, fast)` from `testMode.ts`: train
+    travel 2s → 500ms, roulette spin 4.2s → 1s, slots spin 1.8s → 500ms,
+    auto-spin delay 900ms → 200ms. Do not assert transient "spinning" copy:
+    the shortened animation can settle before Playwright reads it, and the
+    settled result is the assertion that matters.
 - `waitForWorld` waits for the canvas and `[data-world-ready="true"]`. Do not
   add `waitForLoadState("networkidle")` — it is slower and redundant. The flag
   needs `engineReady`, the joined farm snapshot, and (on your own farm) the
@@ -960,7 +976,7 @@ reason (the repo already has one for a deliberate hook dependency).
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid. Use
   `holdKeys` only for short geometry legs between prompts, never as a
   stand-in for "walk until the prompt appears".
-- `walkUntilPrompt` polls every 60ms and releases the movement keys *inside*
+- `walkUntilPrompt` polls every 40ms and releases the movement keys *inside*
   the page as soon as the prompt matches. Do not "improve" that back into a
   release over the wire: the canvas runs at a few frames per second on a loaded
   runner, so a late release walks the player out of neighbouring interaction
@@ -984,12 +1000,12 @@ reason (the repo already has one for a deliberate hook dependency).
 - e2e runs against the **built** SPA served by Phoenix on port 3201, not Vite.
 - `pnpm test:e2e` runs `vite build` first. If you changed frontend code, do not
   run Playwright without rebuilding.
-- The suite runs `fullyParallel` with **2 workers everywhere**
-  (`workers: Number(process.env.E2E_WORKERS ?? 2)`). A faster local machine
-  started at its own core count just saturates the CPU and makes every walk
-  slower than it is with two; raise `E2E_WORKERS` to experiment. The per-test
-  timeout is 90s (the longest paths, like the casino, set their own larger
-  budget).
+- The suite runs `fullyParallel` with **2 workers by default**
+  (`workers: Number(process.env.E2E_WORKERS ?? 2)`); CI sets `E2E_WORKERS=3`
+  because the runner has 4 vCPUs. A faster local machine started at its own core
+  count just saturates the CPU and makes every walk slower than it is with two;
+  raise `E2E_WORKERS` to experiment. The per-test timeout is 90s (the longest
+  paths, like the casino, set their own larger budget).
 
 ### 10.4 CI
 
@@ -1000,7 +1016,8 @@ reason (the repo already has one for a deliberate hook dependency).
 3. `pnpm lint:backend`
 4. Install Chromium.
 5. `pnpm check` (lint, Vitest, ExUnit, build).
-6. `pnpm test:e2e`.
+6. `pnpm test:e2e:run` (Playwright only). `pnpm check` already ran `pnpm build`,
+   so the e2e step must not rebuild; CI also sets `E2E_WORKERS=3`.
 
 The required status check name is **`test`**; renaming the job silently
 removes the required check from the ruleset. There is also a `secrets` job that
@@ -1095,8 +1112,9 @@ runs Gitleaks.
 1. Extend `WalkingScene` for a standard walkable area, or `ex.Scene` if it needs
    custom behavior.
 2. Add a `*Data.ts` module for terrain, props, spawn points, and entrances.
-3. Add a `*Resources.ts` module and register images in the world's resource
-   list (or `resources.ts`).
+3. Add a `*Resources.ts` module with its image sources, then add the scene to
+   `WorldSceneName` and to `sceneAssets` in `worldAssets.ts`. A scene that is
+   not in `sceneAssets` cannot boot or be travelled to safely.
 4. Define walk obstacles in `sceneObstacles.ts` using `propObstacles`.
 5. Register the scene with `engine.addScene(...)` in `src/world/FarmMap.tsx`.
 6. Add a `SceneInteraction` with `destination` and `destinationSpawn`; extend
@@ -1178,8 +1196,9 @@ runs Gitleaks.
 22. **Moving props are indexed by source order.** `FarmProps.@assets` must
     match `props` in `mapData.ts`. Reordering props without updating both
     corrupts dig/place behavior.
-23. **Assets are loaded through `ImageSource`.** Add new images to the relevant
-    resource array or they render blank. Paths are relative to `/assets/`.
+23. **Assets are loaded through `ImageSource`, one scene at a time.** Add new
+    images to the relevant resource array *and* to that scene's group in
+    `worldAssets.ts`, or they render blank. Paths are relative to `/assets/`.
 24. **Keep e2e testids stable.** Renaming `farm-tile`, `travel-prompt`,
     `slot-hotbar-N`, `farm-balance`, etc. breaks tests.
 25. **`shared/auth.ts` has unused-looking fields.** `User.createdAt` is never

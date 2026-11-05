@@ -19,8 +19,11 @@ test("enter the livestock market and buy a pig from its pen", async ({
 	await useDoor(page);
 	await expectArea(page, /^Livestock Market map/, 10_000);
 
-	// Step into the aisle, then walk east until a pen is in reach.
-	await holdKeys(page, ["w"], 500);
+	// Step into the lower aisle (level with the pig's approach point), then walk
+	// east until its pen is in reach. The hold is timed because the upper pens
+	// block the aisle before any prompt appears; at 3x walking it needs about a
+	// third of the old 2x distance.
+	await holdKeys(page, ["w"], 300);
 	await walkUntilPrompt(page, ["d"], "buy a pig");
 	await useDoor(page);
 

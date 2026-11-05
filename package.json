@@ -18,6 +18,7 @@
     "test": "vitest run --passWithNoTests",
     "test:backend": "node scripts/run-mix.mjs test",
     "test:e2e": "vite build && playwright test",
+    "test:e2e:run": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "lint": "biome lint src shared e2e && node scripts/max-lines.mjs && pnpm sanity",
     "lint:backend": "node scripts/run-mix.mjs format --check-formatted && node scripts/run-mix.mjs credo --strict",

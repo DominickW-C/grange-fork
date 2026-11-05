@@ -92,11 +92,14 @@ test("a sprinkler placed on tilled soil waters its 2x2", async ({ page }) => {
 	);
 
 	// Planting over the sprinkled tile still works, and the sprinkler waters it
-	// on its own tick with no watering action.
+	// on its own tick with no watering action. The e2e clock ripens a watered
+	// crop almost immediately, so accept either state: reaching `ready` at all
+	// proves the sprinkler watered it (an unwatered planted tile never grows).
 	await page.keyboard.press("2");
 	await page.keyboard.press("Space");
 	await hoverFarmTile(page, 9, 9);
-	await expect(page.getByTestId("farm-tile")).toContainText("(9, 9): watered", {
-		timeout: 10_000,
-	});
+	await expect(page.getByTestId("farm-tile")).toContainText(
+		/\(9, 9\): (?:watered|ready)/,
+		{ timeout: 10_000 },
+	);
 });

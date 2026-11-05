@@ -16,11 +16,11 @@ const HOLD_REPEAT_MS = 250;
  * How often a walk re-reads the prompt.
  *
  * Polling must be much faster than the key resend: movement keeps going while
- * the loop waits, and e2e runs walk at double speed. Neighbouring interaction
+ * the loop waits, and e2e runs walk at triple speed. Neighbouring interaction
  * radii can overlap (the casino's poker and slot radii do), so a quarter second
  * of extra walking can carry the player out of the prompt it just matched.
  */
-const POLL_MS = 60;
+const POLL_MS = 40;
 
 /** Asserts the world is showing `area`'s scene. */
 export async function expectArea(
@@ -183,7 +183,10 @@ export async function rideTrain(
  */
 async function reachShopLane(page: Page): Promise<void> {
 	await walkUntilPrompt(page, ["w"], "enter the casino", TRAVEL_TIMEOUT);
-	await holdKeys(page, ["w"], 1_000);
+	// About the ground the old one-second hold covered at 2x walking (320px),
+	// now at 3x. The shop fronts dead-end the climb, so a little extra cannot
+	// overshoot the lane.
+	await holdKeys(page, ["w"], 700);
 }
 
 /**

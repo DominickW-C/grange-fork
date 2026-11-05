@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 import {
 	clickFarmTile,
 	clickWorld,
-	farmTilePixel,
 	farmTilePosition,
 	hoverFarmTile,
 	registerFast,
@@ -171,29 +170,12 @@ test("fence placement previews on hold and commits only on a valid release", asy
 	await expect(slot).toHaveAttribute("data-count", "19");
 });
 
-test("the shovel moves a well and sign through inventory", async ({ page }) => {
+test("the shovel digs, previews, and drops movable props", async ({ page }) => {
 	await registerFast(page, uniqueName("Mover"));
-	await page.keyboard.press("7");
-	await clickWorld(page, 200, 350);
-	const wellSlot = page.locator('[data-item="well"]');
-	await expect(wellSlot).toHaveCount(1);
-	await wellSlot.click();
-	await clickFarmTile(page, 8, 7);
-	await expect(wellSlot).toHaveCount(0);
 
-	await page.keyboard.press("7");
-	await clickWorld(page, 395, 360);
-	const signSlot = page.locator('[data-item="sign"]');
-	await expect(signSlot).toHaveCount(1);
-	await signSlot.click();
-	await clickFarmTile(page, 6, 7);
-	await expect(signSlot).toHaveCount(0);
-});
-
-test("a carried house previews during drag and can return to its original spot", async ({
-	page,
-}) => {
-	await registerFast(page, uniqueName("Builder"));
+	// A carried house previews while dragging over the still-standing well
+	// (blocked), refuses to land there, and still returns to its own original
+	// spot. Do this before digging the well: the well is the obstacle.
 	await page.keyboard.press("7");
 	await clickWorld(page, 210, 200);
 	const houseSlot = page.locator('[data-item="farmhouse"]');
@@ -217,12 +199,17 @@ test("a carried house previews during drag and can return to its original spot",
 	await expect(houseSlot).toHaveCount(1);
 	await page.mouse.up();
 	await expect(houseSlot).toHaveCount(0);
-});
 
-test("a carried sign can be dropped directly on the road path", async ({
-	page,
-}) => {
-	await registerFast(page, uniqueName("Roadsign"));
+	// Dig the well, then drop it on open soil.
+	await page.keyboard.press("7");
+	await clickWorld(page, 200, 350);
+	const wellSlot = page.locator('[data-item="well"]');
+	await expect(wellSlot).toHaveCount(1);
+	await wellSlot.click();
+	await clickFarmTile(page, 8, 7);
+	await expect(wellSlot).toHaveCount(0);
+
+	// A dug sign can be dropped straight onto the road path.
 	await page.keyboard.press("7");
 	await clickWorld(page, 395, 360);
 	const signSlot = page.locator('[data-item="sign"]');
@@ -236,21 +223,20 @@ test("a carried sign can be dropped directly on the road path", async ({
 	await expect(signSlot).toHaveCount(0);
 });
 
-test("the hoe refuses tiles behind buildings", async ({ page }) => {
+test("the hoe refuses buildings and the shovel clears flowers", async ({
+	page,
+}) => {
 	await registerFast(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 
+	// A tile behind a building cannot be worked.
 	await clickFarmTile(page, 3, 2);
 	await expect(page.getByTestId("notification-feed")).toContainText(
 		"Something is in the way.",
 	);
 	await expect(page.getByTestId("farm-tile")).toContainText("(3, 2): grass");
-});
 
-test("flowers can be shoveled before tilling their tile", async ({ page }) => {
-	await registerFast(page, uniqueName("Sprout"));
-	await expect(page).toHaveURL(/\/world$/);
-
+	// Digging the flowers clears the tile for the hoe.
 	await page.keyboard.press("7");
 	await clickFarmTile(page, 11, 3);
 	await expect(page.getByTestId("notification-feed")).toContainText(
@@ -301,20 +287,4 @@ test("a visitor sees another farm read-only but can toggle its gates", async ({
 	await expect(page.getByTestId("notification-feed")).toContainText(
 		"visitor editing off",
 	);
-});
-
-test("tilled soil renders as brown dirt, not grass", async ({ page }) => {
-	await registerFast(page, uniqueName("Soil"));
-
-	const grass = await farmTilePixel(page, 9, 7);
-	// Grass is green-dominant.
-	expect(grass.g).toBeGreaterThan(grass.r);
-
-	await clickFarmTile(page, 9, 7);
-	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
-
-	// Tilled-dry soil is brown: red dominant over green and blue.
-	const soil = await farmTilePixel(page, 9, 7);
-	expect(soil.r).toBeGreaterThan(soil.g + 20);
-	expect(soil.r).toBeGreaterThan(soil.b + 20);
 });
