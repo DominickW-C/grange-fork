@@ -36,10 +36,13 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 		"9",
 	);
 
-	// Bucket
+	// Bucket. The e2e clock can ripen the tile before this assertion runs, and
+	// `ready` also proves the watering landed.
 	await page.keyboard.press("3");
 	await clickFarmTile(page, 9, 7);
-	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): watered");
+	await expect(page.getByTestId("farm-tile")).toContainText(
+		/\(9, 7\): (?:watered|ready)/,
+	);
 
 	// Wait for 10s growth, then harvest
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): ready", {
@@ -52,8 +55,11 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 		"data-count",
 		"1",
 	);
-	// Tomatoes regrow, so the tile resumes growing instead of clearing.
-	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): watered");
+	// Tomatoes regrow, so the tile resumes growing instead of clearing. The
+	// fast e2e clock may already have ripened the regrow.
+	await expect(page.getByTestId("farm-tile")).toContainText(
+		/\(9, 7\): (?:watered|ready)/,
+	);
 
 	// Drag-paint tills two tiles at once
 	await page.keyboard.press("1");

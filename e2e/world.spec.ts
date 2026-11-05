@@ -178,7 +178,9 @@ test("selling a harvested tomato credits the wallet", async ({ page }) => {
 	await expect(tile).toContainText("(9, 9): planted");
 	await page.keyboard.press("3");
 	await page.keyboard.press("Space");
-	await expect(tile).toContainText("(9, 9): watered");
+	// The e2e clock can ripen the tile before this assertion runs; `ready`
+	// also proves the watering landed.
+	await expect(tile).toContainText(/\(9, 9\): (?:watered|ready)/);
 
 	// The e2e growth window is short (GRANGE_GROW_MS), then harvest one tomato.
 	await expect(tile).toContainText("(9, 9): ready", { timeout: 20_000 });
