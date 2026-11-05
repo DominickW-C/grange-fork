@@ -23,6 +23,7 @@ import { marketplaceResources } from "./marketplaceResources";
 import { resources } from "./resources";
 import { sprinklerResources } from "./sprinklerResources";
 import { consumeTrainArrival } from "./trainArrival";
+import { requestedStartArea } from "./testMode";
 import type { WorldArea } from "./WalkingScene";
 
 const worldResources = [
@@ -175,8 +176,13 @@ export function useWorldEngine(
 				if (cancelled) return;
 				await engine.start();
 				if (cancelled) return;
+				// The arrival flag is one-shot, so always drain it even when the
+				// e2e `?area=` hook takes over the first scene.
 				const arrival = consumeTrainArrival();
-				if (arrival === "marketplace") {
+				const startArea = isOwner ? requestedStartArea() : null;
+				if (startArea) {
+					await engine.goToScene(startArea);
+				} else if (arrival === "marketplace") {
 					await engine.goToScene("marketplace", {
 						sceneActivationData: { trainArriving: true },
 					});
@@ -190,6 +196,11 @@ export function useWorldEngine(
 				} else {
 					await engine.goToScene("farm-map");
 				}
+				// The engine is live once the first scene is active. Do not wait
+				// for the farm scene's HUD emit: a world that boots into a hub
+				// never initializes that scene, and the readiness gate would
+				// stay false forever.
+				if (!cancelled) setEngineReady(true);
 			},
 		);
 

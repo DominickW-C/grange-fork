@@ -26,7 +26,8 @@ test("HUD shows hotbar and prompts with a clear top screen", async ({
 			"[data-testid='hotbar'], [data-testid='open-inventory'], [data-testid='open-pause'], [data-testid='farm-balance'], [data-testid='notification-feed']",
 		)) {
 			const rect = (el as HTMLElement).getBoundingClientRect();
-			if (rect.bottom <= limit) hits.push((el as HTMLElement).dataset.testid ?? "?");
+			if (rect.bottom <= limit)
+				hits.push((el as HTMLElement).dataset.testid ?? "?");
 		}
 		return hits;
 	});
@@ -75,7 +76,9 @@ test("Grangecoin is a wallet counter, not an inventory item", async ({
 	await page.keyboard.press("i");
 	await expect(page.getByTestId("inventory-panel")).toBeVisible();
 
-	const coinSlots = page.locator("[data-testid^='slot-'][data-item='grangecoin']");
+	const coinSlots = page.locator(
+		"[data-testid^='slot-'][data-item='grangecoin']",
+	);
 	await expect(coinSlots).toHaveCount(0);
 
 	// The wallet counter is shown instead.
@@ -138,4 +141,3 @@ test("Quit to Main Menu keeps the session and returns to the menu", async ({
 	await enterFarm(page);
 	await expect(page).toHaveURL(/\/world$/);
 });
-

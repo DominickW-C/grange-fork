@@ -31,9 +31,14 @@ defmodule Grange.Farm do
   @spec grid_size() :: pos_integer()
   def grid_size, do: @grid_size
 
-  @doc "How long a watered tile takes to become ready, in milliseconds."
+  @doc """
+  How long a watered tile takes to become ready, in milliseconds.
+
+  Defaults to 10 seconds; dev/test runs may shorten it with the `:grow_ms`
+  app config so e2e specs do not sit through a full growth cycle.
+  """
   @spec grow_ms() :: pos_integer()
-  def grow_ms, do: @grow_ms
+  def grow_ms, do: Application.get_env(:grange, :grow_ms, @grow_ms)
 
   @doc "How many tomatoes a harvest yields."
   @spec harvest_yield() :: pos_integer()
@@ -71,7 +76,7 @@ defmodule Grange.Farm do
 
   @doc "Waters a planted tile, scheduling when it becomes ready."
   @spec water(tile(), integer()) :: {:ok, tile()} | {:error, String.t()}
-  def water(%{state: :planted} = tile, now), do: water(tile, now, @grow_ms)
+  def water(%{state: :planted} = tile, now), do: water(tile, now, grow_ms())
   def water(_tile, _now), do: {:error, "tile is not planted"}
 
   @doc """

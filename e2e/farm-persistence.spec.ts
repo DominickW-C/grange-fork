@@ -1,9 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-	clickFarmTile,
-	registerFast,
-	uniqueName,
-} from "./helpers";
+import { clickFarmTile, registerFast, uniqueName } from "./helpers";
 
 test("planted seed counts survive a page refresh", async ({ page }) => {
 	await registerFast(page, uniqueName("Persist"));

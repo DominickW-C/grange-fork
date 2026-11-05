@@ -1,41 +1,22 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { MAP_COLUMNS, MAP_ROWS } from "../src/world/mapData";
 import {
 	BASE,
-	TRAVEL_TIMEOUT,
-	holdKeys,
 	hoverFarmTile,
 	registerFast,
-	rideTrain,
 	uniqueName,
-	waitForTrainStop,
+	useDoor,
 	waitForWorld,
-	walkUntilPrompt,
+	walkToHardwareStore,
 } from "./helpers";
-
-/** Walks to the hardware stall door from the marketplace train stop. */
-async function walkToHardwareStore(page: Page) {
-	await walkUntilPrompt(page, ["w"], "enter the casino", TRAVEL_TIMEOUT);
-	await holdKeys(page, ["w"], 1_500);
-	await walkUntilPrompt(page, ["d"], "shop at the hardware store");
-}
 
 test("the hardware stall opens a market window and sells sprinklers", async ({
 	page,
 }) => {
-	await registerFast(page, uniqueName("Builder"));
-
-	await walkUntilPrompt(page, ["d"], "board the train");
-	await rideTrain(page, "marketplace");
-	await expect(page.locator("canvas")).toHaveAttribute(
-		"aria-label",
-		/^Marketplace map/,
-		{ timeout: TRAVEL_TIMEOUT },
-	);
-	await waitForTrainStop(page);
+	await registerFast(page, uniqueName("Builder"), { area: "marketplace" });
 
 	await walkToHardwareStore(page);
-	await page.keyboard.press("e");
+	await useDoor(page);
 
 	const store = page.getByTestId("market-window");
 	await expect(store).toBeVisible();
@@ -98,10 +79,10 @@ test("a sprinkler placed on tilled soil waters its 2x2", async ({ page }) => {
 	// Select the sprinkler and drop it on the corner that covers the tilled tile.
 	await page.keyboard.press("9");
 	const box = await page.locator("canvas.farm-map-canvas").boundingBox();
-	expect(box).not.toBeNull();
+	if (!box) throw new Error("the world canvas is not laid out");
 	await page.mouse.move(
-		box!.x + (9 / MAP_COLUMNS) * box!.width,
-		box!.y + (9 / MAP_ROWS) * box!.height,
+		box.x + (9 / MAP_COLUMNS) * box.width,
+		box.y + (9 / MAP_ROWS) * box.height,
 	);
 	await page.mouse.down();
 	await page.mouse.up();

@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
 import {
 	BASE,
-	TRAVEL_TIMEOUT,
+	expectArea,
+	hoverFarmTile,
 	registerFast,
 	rideTrain,
 	uniqueName,
+	useDoor,
 	waitForTrainStop,
+	walkToProduceMarket,
 	walkToSeedMarket,
 	walkUntilPrompt,
 } from "./helpers";
@@ -36,39 +39,14 @@ test("farm world loads without asset or page errors", async ({ page }) => {
 	expect(failedAssets).toEqual([]);
 });
 
-test("the train travels between the farm and marketplace", async ({ page }) => {
-	await registerFast(page, uniqueName("Traveler"));
-
-	const canvas = page.locator("canvas");
-	await expect(canvas).toHaveAttribute("aria-label", /^Farm map/);
-
-	await walkUntilPrompt(page, ["d"], "board the train");
-	await rideTrain(page, "marketplace");
-
-	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
-		timeout: TRAVEL_TIMEOUT,
-	});
-	await waitForTrainStop(page);
-	await rideTrain(page, "home");
-	await expect(canvas).toHaveAttribute("aria-label", /^Farm map/, {
-		timeout: TRAVEL_TIMEOUT,
-	});
-});
-
 test("the seed market opens the Seed Stall buy view", async ({ page }) => {
-	await registerFast(page, uniqueName("Seedseller"));	const canvas = page.locator("canvas");
+	await registerFast(page, uniqueName("Seedseller"), { area: "marketplace" });
 	const prompt = page.getByTestId("travel-prompt");
-	await walkUntilPrompt(page, ["d"], "board the train");
-	await rideTrain(page, "marketplace");
-	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/, {
-		timeout: TRAVEL_TIMEOUT,
-	});
-	await waitForTrainStop(page);
 
 	await walkToSeedMarket(page);
 
 	await expect(prompt).toContainText("enter the seed market");
-	await page.keyboard.press("e");
+	await useDoor(page);
 
 	const market = page.getByTestId("market-window");
 	await expect(market).toBeVisible();
@@ -80,7 +58,9 @@ test("the seed market opens the Seed Stall buy view", async ({ page }) => {
 	await expect(page.getByTestId("market-item-tomato-seed")).toContainText(
 		"Tomato Seeds",
 	);
-	await expect(page.getByTestId("market-price-tomato-seed")).toContainText("8 GC");
+	await expect(page.getByTestId("market-price-tomato-seed")).toContainText(
+		"8 GC",
+	);
 	await expect(page.getByTestId("market-inventory-grid")).toBeVisible();
 	// The numeric hotbar stays docked while the shop is open.
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
@@ -122,22 +102,13 @@ test("the seed market opens the Seed Stall buy view", async ({ page }) => {
 test("the produce market opens the Produce Stall sell grid", async ({
 	page,
 }) => {
-	await registerFast(page, uniqueName("Trader"));
+	await registerFast(page, uniqueName("Trader"), { area: "marketplace" });
 
 	const prompt = page.getByTestId("travel-prompt");
-	await walkUntilPrompt(page, ["d"], "board the train");
-	await rideTrain(page, "marketplace");
-	await expect(page.locator("canvas")).toHaveAttribute(
-		"aria-label",
-		/^Marketplace map/,
-		{ timeout: TRAVEL_TIMEOUT },
-	);
-	await waitForTrainStop(page);
-
-	await walkUntilPrompt(page, ["w", "a"], "enter the produce market");
+	await walkToProduceMarket(page);
 
 	await expect(prompt).toContainText("enter the produce market");
-	await page.keyboard.press("e");
+	await useDoor(page);
 
 	const market = page.getByTestId("market-window");
 	await expect(market).toBeVisible();
@@ -153,7 +124,9 @@ test("the produce market opens the Produce Stall sell grid", async ({
 	await expect(page.getByTestId("market-item-midas_wheat")).toContainText(
 		"MIDAS WHEAT",
 	);
-	await expect(page.getByTestId("market-stock-tomato")).toContainText("STOCK: 0");
+	await expect(page.getByTestId("market-stock-tomato")).toContainText(
+		"STOCK: 0",
+	);
 	// Nothing harvested yet, so selling is unavailable.
 	await expect(page.getByTestId("market-sell-tomato")).toBeDisabled();
 	await expect(page.getByTestId("market-sellall-tomato")).toBeDisabled();
@@ -169,7 +142,9 @@ test("the produce market opens the Produce Stall sell grid", async ({
 	await expect(market).toHaveCount(0);
 });
 
-test("the farm map is closed to visitors without a session", async ({ page }) => {
+test("the farm map is closed to visitors without a session", async ({
+	page,
+}) => {
 	await page.goto("/world");
 
 	await expect(page).toHaveURL("/");
@@ -184,12 +159,7 @@ test("selling a harvested tomato credits the wallet", async ({ page }) => {
 	// Hoe, plant, and water the tile the player spawns on, then harvest it.
 	const tiles = page.getByTestId("farm-map-tiles");
 	const tile = page.getByTestId("farm-tile");
-	const box = await page.locator(".farm-map-canvas").boundingBox();
-	expect(box).not.toBeNull();
-	await page.mouse.move(
-		box!.x + (9.5 / 18) * box!.width,
-		box!.y + (9.5 / 12) * box!.height,
-	);
+	await hoverFarmTile(page, 9, 9);
 	await page.keyboard.press("1");
 	await page.keyboard.press("Space");
 	await expect(tiles).toHaveText("1 tiles");
@@ -201,7 +171,7 @@ test("selling a harvested tomato credits the wallet", async ({ page }) => {
 	await page.keyboard.press("Space");
 	await expect(tile).toContainText("(9, 9): watered");
 
-	// Wait out the 10s growth, then harvest for one tomato.
+	// The e2e growth window is short (GRANGE_GROW_MS), then harvest one tomato.
 	await expect(tile).toContainText("(9, 9): ready", { timeout: 20_000 });
 	await page.keyboard.press("4");
 	await page.keyboard.press("Space");
@@ -215,24 +185,24 @@ test("selling a harvested tomato credits the wallet", async ({ page }) => {
 	// Travel to the marketplace and open the produce market.
 	await walkUntilPrompt(page, ["d"], "board the train");
 	await rideTrain(page, "marketplace");
-	await expect(page.locator("canvas")).toHaveAttribute(
-		"aria-label",
-		/^Marketplace map/,
-		{ timeout: TRAVEL_TIMEOUT },
-	);
+	await expectArea(page, /^Marketplace map/);
 	await waitForTrainStop(page);
-	await walkUntilPrompt(page, ["w", "a"], "enter the produce market");
-	await page.keyboard.press("e");
+	await walkToProduceMarket(page);
+	await useDoor(page);
 
 	const market = page.getByTestId("market-window");
 	await expect(market).toBeVisible();
-	await expect(page.getByTestId("market-stock-tomato")).toContainText("STOCK: 1");
+	await expect(page.getByTestId("market-stock-tomato")).toContainText(
+		"STOCK: 1",
+	);
 	await expect(page.getByTestId("market-sell-tomato")).toBeEnabled();
 	await expect(page.getByTestId("market-sellall-tomato")).toBeEnabled();
 
 	// SELL ALL moves the whole stack for its crop value.
 	await page.getByTestId("market-sellall-tomato").click();
-	await expect(page.getByTestId("market-stock-tomato")).toContainText("STOCK: 0");
+	await expect(page.getByTestId("market-stock-tomato")).toContainText(
+		"STOCK: 0",
+	);
 	await expect(page.getByTestId("farm-balance")).toContainText("105");
 	await expect(page.getByTestId("market-sell-tomato")).toBeDisabled();
 	await expect(page.getByTestId("market-sellall-tomato")).toBeDisabled();

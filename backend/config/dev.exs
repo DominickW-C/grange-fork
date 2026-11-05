@@ -7,6 +7,11 @@ config :grange, GrangeWeb.Endpoint,
   server: true
 
 config :grange, enable_test_routes: true
+
+# E2E runs shrink the growth window so specs do not wait 10s per crop. Normal
+# development keeps the full cycle unless GRANGE_GROW_MS is set.
+config :grange, grow_ms: String.to_integer(System.get_env("GRANGE_GROW_MS") || "10000")
+
 config :logger, level: :info
 
 config :grange, Grange.Repo,
