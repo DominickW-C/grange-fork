@@ -24,6 +24,32 @@ test("a new account registers, lands on the main menu, then enters the farm", as
 	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
 
+test("creating an account shows the celebration box before the menu", async ({
+	page,
+}) => {
+	const name = uniqueName("Sprout");
+	await page.goto(`${BASE}/login`);
+	await page.getByTestId("toggle-mode").click();
+	await page.getByTestId("username").fill(name);
+	await page.getByTestId("email").fill(`${name}@example.test`);
+	await page.getByTestId("password").fill("long-enough-pass");
+	await page.getByRole("button", { name: /Create Account/i }).click();
+
+	const dialog = page.getByTestId("account-created");
+	await expect(dialog).toBeVisible();
+	await expect(dialog).toContainText(/account created/i);
+	await expect(dialog).toContainText(name);
+	await expect(page.getByTestId("account-created-video")).toHaveAttribute(
+		"src",
+		/account-created\.mp4$/,
+	);
+	await expect(page).toHaveURL(`${BASE}/login`);
+
+	await page.getByTestId("account-created-continue").click();
+	await expect(page).toHaveURL(`${BASE}/`);
+	await expect(page.getByTestId("menu-user")).toContainText(name);
+});
+
 test("wrong credentials do not get past the login screen", async ({ page }) => {
 	const name = uniqueName("Sprout");
 	await register(page, name);
@@ -106,6 +132,7 @@ test("registration rejects a short password and a duplicate username", async ({
 
 	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
+	await page.getByTestId("account-created-continue").click();
 	await page.waitForURL(`${BASE}/`);
 	await page.getByTestId("menu-user").waitFor();
 

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import type { AuthUser } from "../../shared/auth";
 import { login, register } from "../auth";
+import { AccountCreatedDialog } from "./AccountCreatedDialog";
 
 type Mode = "signin" | "signup";
 
@@ -15,6 +17,7 @@ export default function Login() {
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
 	const [busy, setBusy] = useState(false);
+	const [created, setCreated] = useState<AuthUser | null>(null);
 	const navigate = useNavigate();
 
 	function switchMode(next: Mode) {
@@ -38,17 +41,31 @@ export default function Login() {
 						});
 			if (res.ok && res.user) {
 				// login()/register() already stored the user and rebound the socket.
-				// Land on the main menu, signed in; Continue enters the farm.
+				// A new account gets the celebration box first; signing in still
+				// lands on the main menu directly.
+				if (mode === "signup") {
+					setCreated(res.user);
+					return;
+				}
 				navigate("/");
 				return;
 			}
-			// Stays on the main menu: nothing navigates without a server-issued session.
+			// Stays on the login screen: nothing navigates without a session.
 			setError(res.error ?? "Something went wrong");
 		} catch {
 			setError("Could not reach the server");
 		} finally {
 			setBusy(false);
 		}
+	}
+
+	if (created) {
+		return (
+			<AccountCreatedDialog
+				username={created.username}
+				onContinue={() => navigate("/")}
+			/>
+		);
 	}
 
 	return (
@@ -116,7 +133,10 @@ export default function Login() {
 					</button>
 
 					{error && (
-						<p data-testid="auth-error" className="text-center text-sm text-pumpkin">
+						<p
+							data-testid="auth-error"
+							className="text-center text-sm text-pumpkin"
+						>
 							{error}
 						</p>
 					)}

@@ -2,6 +2,11 @@
 import { execFileSync } from "node:child_process";
 
 const MAX_BYTES = 1_000_000;
+// The account-created celebration clip is intentionally committed at full
+// resolution. Squeezing it under the normal cap would require downscaling the
+// video, so allow mp4s up to a bounded size.
+const MAX_VIDEO_BYTES = 50_000_000;
+const VIDEO_FILE = /\.mp4$/i;
 const REV = process.env.SANITY_REV || "HEAD";
 
 const NODE_MODULES = /(^|\/)node_modules(\/|$)/;
@@ -112,7 +117,10 @@ for (const { path, size } of files) {
 		violations.push(`FAIL ${path}: node_modules must not be committed`);
 	}
 	if (size > MAX_BYTES) {
-		violations.push(`FAIL ${path}: ${human(size)} exceeds ${human(MAX_BYTES)} limit`);
+		const cap = VIDEO_FILE.test(path) ? MAX_VIDEO_BYTES : MAX_BYTES;
+		if (size > cap) {
+			violations.push(`FAIL ${path}: ${human(size)} exceeds ${human(cap)} limit`);
+		}
 	}
 	if (JUNK_PATTERNS.some((pattern) => pattern.test(path))) {
 		violations.push(`FAIL ${path}: generated/build artifact or junk file`);
@@ -140,4 +148,6 @@ if (violations.length > 0) {
 	process.exit(1);
 }
 
-console.log(`OK: ${files.length} committed file(s); no node_modules, junk, secrets, conflict markers, case collisions, or oversized files.`);
+console.log(
+	`OK: ${files.length} committed file(s); no node_modules, junk, secrets, conflict markers, case collisions, or oversized files (mp4s up to ${human(MAX_VIDEO_BYTES)} allowed).`,
+);

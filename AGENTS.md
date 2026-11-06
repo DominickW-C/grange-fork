@@ -30,7 +30,8 @@ something new.
    `shared/` is shared across the frontend, **not** importable by Elixir.
 5. **Never commit generated or secret files.** No `.env`, SQLite files,
    `backend/priv/static`, `node_modules`, logs, or build output.
-   `scripts/repo-sanity.mjs` enforces this.
+   `scripts/repo-sanity.mjs` enforces this. The one size exception is `.mp4`
+   assets, which may be up to 50 MB; every other file stays under 1 MB.
 6. **Do not rename or remove `data-testid` values casually.** Playwright relies
    on them heavily. Add new ones when adding UI.
 7. **Do not edit old migrations.** Add a new timestamped migration; migrations
@@ -186,6 +187,10 @@ Production / e2e
   - `/dashboard` → `RequireAuth` + `Dashboard` (lobby: players, farms, visit)
 - `RequireAuth` resolves the session before rendering, and redirects to `/` if
   unauthenticated.
+- A successful **registration** keeps the page on `/login` and shows
+  `AccountCreatedDialog` (a canvas-keyed clip from
+  `public/assets/video/account-created.mp4`); only **Continue** navigates to
+  the main menu. Signing in still goes straight to `/`.
 - `useSession` calls `fetchMe()` once and returns `{ready, signedIn}`.
 
 ### 5.3 Backend supervision tree
@@ -939,7 +944,8 @@ reason (the repo already has one for a deliberate hook dependency).
   (`uniqueName`) instead, which is what lets the suite run in parallel.
 - Use `registerFast` (auth API + `goto`) unless the test is about the login
   form itself; only `auth.spec.ts` drives the UI registration flow
-  (`registerAccount` / `register`).
+  (`registerAccount` / `register`). Those helpers dismiss the Account Created
+  dialog before waiting for the main menu.
 - **Deep-link into the scene under test.** `registerFast(page, name, { area:
   "casino" })` boots `/world?area=casino` instead of walking there. The real
   navigation loop is covered once, in `journey.spec.ts`; feature specs should

@@ -59,6 +59,8 @@ export async function registerAccount(
 	await page.getByTestId("email").fill(`${username}@example.test`);
 	await page.getByTestId("password").fill(password);
 	await page.getByRole("button", { name: /Create Account/i }).click();
+	// Registration now shows a celebration box before the menu.
+	await page.getByTestId("account-created-continue").click();
 	await page.waitForURL(`${BASE}/`);
 	await page.getByTestId("menu-user").waitFor();
 	return username;

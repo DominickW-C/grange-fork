@@ -1,0 +1,88 @@
+.account-created-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.5rem;
+	background: rgba(23, 17, 10, 0.92);
+	backdrop-filter: blur(4px);
+}
+
+.account-created-panel {
+	width: min(42rem, 100%);
+	max-height: calc(100vh - 3rem);
+	overflow: auto;
+	padding: 1.5rem;
+	border: 1px solid rgba(240, 192, 64, 0.45);
+	border-radius: 0.75rem;
+	background:
+		radial-gradient(
+			600px 300px at 50% 0%,
+			rgba(240, 192, 64, 0.12),
+			transparent 70%
+		),
+		var(--barn);
+	box-shadow:
+		0 0 32px rgba(0, 0, 0, 0.6),
+		inset 0 0 0 1px rgba(155, 90, 143, 0.25);
+	text-align: center;
+}
+
+.account-created-title {
+	margin: 0 0 0.35rem;
+	color: var(--barn-red);
+	font-size: 2rem;
+	text-shadow: 0 0 14px rgba(214, 69, 65, 0.45);
+}
+
+.account-created-subtitle {
+	margin: 0 0 1rem;
+	color: var(--husk);
+	font-size: 0.85rem;
+	letter-spacing: 0.05em;
+}
+
+/* Kept in the layout so the browser still decodes frames for the canvas, but
+   out of sight behind the panel. */
+.account-created-source {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.account-created-video {
+	display: block;
+	width: 100%;
+	height: auto;
+	margin: 0 auto 1.25rem;
+	background: transparent;
+}
+
+.account-created-continue {
+	appearance: none;
+	padding: 0.65rem 2rem;
+	border: 1px solid rgba(214, 69, 65, 0.6);
+	border-radius: 0.25rem;
+	background: rgba(214, 69, 65, 0.1);
+	color: var(--barn-red);
+	font-family: var(--font-display);
+	font-size: 0.95rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition:
+		background 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.account-created-continue:hover,
+.account-created-continue:focus-visible {
+	background: rgba(214, 69, 65, 0.22);
+	box-shadow: 0 0 14px rgba(214, 69, 65, 0.5);
+	outline: none;
+}
