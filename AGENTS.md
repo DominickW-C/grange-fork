@@ -189,8 +189,8 @@ Production / e2e
   unauthenticated.
 - A successful **registration** keeps the page on `/login` and shows
   `AccountCreatedDialog` (a canvas-keyed clip from
-  `public/assets/video/account-created.mp4`); only **Continue** navigates to
-  the main menu. Signing in still goes straight to `/`.
+  `public/assets/video/account-created.mp4`); only **Continue** enters the new
+  account's farm at `/world`. Signing in still goes straight to `/`.
 - `useSession` calls `fetchMe()` once and returns `{ready, signedIn}`.
 
 ### 5.3 Backend supervision tree
@@ -945,7 +945,7 @@ reason (the repo already has one for a deliberate hook dependency).
 - Use `registerFast` (auth API + `goto`) unless the test is about the login
   form itself; only `auth.spec.ts` drives the UI registration flow
   (`registerAccount` / `register`). Those helpers dismiss the Account Created
-  dialog before waiting for the main menu.
+  dialog and wait for the new farm at `/world`.
 - **Deep-link into the scene under test.** `registerFast(page, name, { area:
   "casino" })` boots `/world?area=casino` instead of walking there. The real
   navigation loop is covered once, in `journey.spec.ts`; feature specs should

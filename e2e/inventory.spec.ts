@@ -111,7 +111,6 @@ test("Quit to Main Menu keeps the session and returns to the menu", async ({
 }) => {
 	const name = uniqueName("Sprout");
 	await registerAccount(page, name);
-	await enterFarm(page);
 
 	await page.keyboard.press("Escape");
 	await page.getByTestId("pause-quit-menu").click();

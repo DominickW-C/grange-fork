@@ -41,8 +41,8 @@ export default function Login() {
 						});
 			if (res.ok && res.user) {
 				// login()/register() already stored the user and rebound the socket.
-				// A new account gets the celebration box first; signing in still
-				// lands on the main menu directly.
+				// A new account gets the celebration box first, then Continue enters
+				// its farm; signing in still lands on the main menu directly.
 				if (mode === "signup") {
 					setCreated(res.user);
 					return;
@@ -63,7 +63,7 @@ export default function Login() {
 		return (
 			<AccountCreatedDialog
 				username={created.username}
-				onContinue={() => navigate("/")}
+				onContinue={() => navigate("/world")}
 			/>
 		);
 	}

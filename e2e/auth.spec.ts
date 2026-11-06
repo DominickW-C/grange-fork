@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
 	BASE,
-	enterFarm,
 	login,
 	register,
 	registerAccount,
@@ -9,22 +8,16 @@ import {
 	waitForWorld,
 } from "./helpers";
 
-test("a new account registers, lands on the main menu, then enters the farm", async ({
-	page,
-}) => {
+test("a new account registers and lands on its farm", async ({ page }) => {
 	const name = uniqueName("Sprout");
 	await registerAccount(page, name);
 
-	await expect(page).toHaveURL(`${BASE}/`);
-	await expect(page.getByTestId("menu-user")).toContainText(name);
-
-	await enterFarm(page);
 	await expect(page).toHaveURL(/\/world$/);
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
 
-test("creating an account shows the celebration box before the menu", async ({
+test("creating an account shows the celebration box before the farm", async ({
 	page,
 }) => {
 	const name = uniqueName("Sprout");
@@ -46,8 +39,10 @@ test("creating an account shows the celebration box before the menu", async ({
 	await expect(page).toHaveURL(`${BASE}/login`);
 
 	await page.getByTestId("account-created-continue").click();
-	await expect(page).toHaveURL(`${BASE}/`);
-	await expect(page.getByTestId("menu-user")).toContainText(name);
+	await expect(page).toHaveURL(/\/world$/);
+	await waitForWorld(page);
+	await page.keyboard.press("Escape");
+	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
 
 test("wrong credentials do not get past the login screen", async ({ page }) => {
@@ -133,10 +128,12 @@ test("registration rejects a short password and a duplicate username", async ({
 	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
 	await page.getByTestId("account-created-continue").click();
-	await page.waitForURL(`${BASE}/`);
-	await page.getByTestId("menu-user").waitFor();
+	await page.waitForURL("**/world");
+	await waitForWorld(page);
 
-	await page.getByTestId("menu-logout").click();
+	await page.keyboard.press("Escape");
+	await page.getByTestId("logout").click();
+	await page.waitForURL(`${BASE}/`);
 	await page.getByTestId("menu-login").click();
 	await page.waitForURL("**/login");
 	await page.getByTestId("toggle-mode").click();
