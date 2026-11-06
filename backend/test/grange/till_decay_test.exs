@@ -3,20 +3,17 @@ defmodule Grange.TillDecayTest do
   use ExUnit.Case, async: false
 
   import Ecto.Query
+  import Grange.FarmFixtures
 
   alias Grange.{Farm, FarmStore, Inventory, Repo, Tile}
 
   setup do
-    FarmStore.reset()
+    reset_farm_state()
     :ok
   end
 
   defp row(owner, x, y) do
     Repo.one(from(t in Tile, where: t.owner == ^owner and t.x == ^x and t.y == ^y))
-  end
-
-  defp view_tile(owner, x, y) do
-    FarmStore.view(owner).tiles |> Enum.find(&(&1.x == x and &1.y == y))
   end
 
   test "untended tilled soil reverts to grass after the decay window" do
@@ -27,10 +24,10 @@ defmodule Grange.TillDecayTest do
     assert is_integer(tilled_at)
 
     assert FarmStore.tick(tilled_at + Farm.till_decay_ms() - 1) == []
-    assert view_tile("Alice", 3, 3).state == :tilled
+    assert tile_at("Alice", 3, 3).state == :tilled
 
     assert FarmStore.tick(tilled_at + Farm.till_decay_ms()) == ["Alice"]
-    assert view_tile("Alice", 3, 3) == nil
+    assert tile_at("Alice", 3, 3) == nil
   end
 
   test "planting and watering exempt a tile from the till decay" do
@@ -42,11 +39,11 @@ defmodule Grange.TillDecayTest do
 
     now = System.system_time(:millisecond) + Farm.till_decay_ms() * 2
     assert FarmStore.tick(now) == []
-    assert view_tile("Alice", 2, 2).state == :planted
+    assert tile_at("Alice", 2, 2).state == :planted
 
     FarmStore.action("Alice", %{"kind" => "water", "x" => 2, "y" => 2})
     assert FarmStore.tick(now + Farm.grow_ms() + 60_000) == ["Alice"]
-    assert view_tile("Alice", 2, 2).state == :ready
+    assert tile_at("Alice", 2, 2).state == :ready
   end
 
   test "harvesting back to bare soil restarts the decay clock" do
@@ -57,19 +54,19 @@ defmodule Grange.TillDecayTest do
     FarmStore.action("Alice", %{"kind" => "water", "x" => 5, "y" => 5})
 
     FarmStore.tick(System.system_time(:millisecond) + Farm.grow_ms() + 60_000)
-    assert view_tile("Alice", 5, 5).state == :ready
+    assert tile_at("Alice", 5, 5).state == :ready
 
     FarmStore.action("Alice", %{"kind" => "harvest", "x" => 5, "y" => 5, "tool" => "scythe"})
-    assert view_tile("Alice", 5, 5).state == :tilled
+    assert tile_at("Alice", 5, 5).state == :tilled
 
     tilled_at = row("Alice", 5, 5).tilled_at
     assert is_integer(tilled_at)
 
     assert FarmStore.tick(tilled_at + Farm.till_decay_ms() - 1) == []
-    assert view_tile("Alice", 5, 5).state == :tilled
+    assert tile_at("Alice", 5, 5).state == :tilled
 
     assert FarmStore.tick(tilled_at + Farm.till_decay_ms()) == ["Alice"]
-    assert view_tile("Alice", 5, 5) == nil
+    assert tile_at("Alice", 5, 5) == nil
   end
 
   test "reverting soil broadcasts the farm and a single lobby summary" do

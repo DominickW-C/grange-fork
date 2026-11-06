@@ -115,7 +115,7 @@ The old placeholders (`farm/plants/tomato-plant.webp`, `farm/plants/wheat.webp`,
 | Crop registry, stage sprites, economy | `shared/crops.ts` |
 | Combo tiers, synergy bonuses, mutation formula | `shared/mechanics.ts` |
 | Tile model, neighbours, crop encode/decode | `shared/farm.ts` |
-| Client farm simulation (tests/local play) | `src/world/farmState.ts` |
+| Server farm simulation | `backend/lib/grange/farm.ex`, `farm_store.ex`, `farm_tick.ex` |
 | Crop + sweep rendering, resource loading | `src/world/cropLayer.ts`, `resources.ts`, `sweepFx.ts` |
 | Combo tracker + HUD counter | `src/world/comboTracker.ts`, `farmCombo.ts`, `ComboCounter.tsx` |
 | Action resolution + barn reconciler | `src/world/farmActions.ts`, `barnSync.ts` |
@@ -156,8 +156,7 @@ The old placeholders (`farm/plants/tomato-plant.webp`, `farm/plants/wheat.webp`,
 ## 8. Tilled Soil Revert
 
 Bare tilled ground dries out. A tile left in the `tilled` state for **20
-minutes** (`Farm.till_decay_ms/0`, mirrored as `FARM_TILL_DECAY_MS`) reverts to
-grass on the next tick.
+minutes** (`Farm.till_decay_ms/0`) reverts to grass on the next tick.
 
 - Only the empty `tilled` state counts down. Planting or watering moves the tile
   to `planted`/`watered` and clears its `tilled_at` stamp, so a crop is safe
@@ -167,5 +166,23 @@ grass on the next tick.
 - The revert is silent: no client warning, countdown, or new wire field. The
   server deletes the tile and pushes the full farm, and the client repaints
   grass because `FarmTileSync.sync/1` removes tiles that are no longer present.
-- Server only: `FarmTick.run/1` owns the sweep; the client-local
-  `LocalFarmStore` does not model till decay.
+- Server only: `FarmTick.run/1` owns the sweep. There is no client-side farm
+  simulation to keep in sync; the client repaints whatever `farmUpdate` sends.
+
+## 9. Growth Clock and the E2E Override
+
+A watered tile ripens after `Farm.grow_ms/0` — **10 seconds** by default, then
+scaled by the crop's grid synergy. `Farm.water/2` stamps `ready_at` with it, and
+`FarmTick` flips the tile to `ready` once that deadline passes.
+
+The value comes from `Application.get_env(:grange, :grow_ms, 10_000)`, so
+`backend/config/dev.exs` can shorten it:
+
+- `GRANGE_GROW_MS` is read once at boot; unset means the normal 10 seconds.
+- `playwright.config.ts` sets it to `500` in the e2e `webServer` env, so a spec
+  waits half a second instead of ten for a harvest.
+- Production config never sets it, and neither does `MIX_ENV=test`, so ExUnit
+  still drives the clock with explicit `FarmStore.tick/1` calls.
+
+Nothing else changes: the client never simulates growth, so the shortened clock
+is invisible outside the server's tile states.
