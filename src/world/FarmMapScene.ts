@@ -14,6 +14,8 @@ import { SprinklerPlacementPreview } from "./SprinklerPlacementPreview";
 import { SprinklerLayer } from "./sprinklerRendering";
 import { selectedFarmItem } from "./fenceActions";
 import { performFarmAction } from "./farmActionRunner";
+import { canRearrangeProps } from "./farmPropActions";
+import { FarmBarn } from "./FarmBarn";
 import { FarmPropLayer } from "./farmPropLayer";
 import { FarmPlacementPreview } from "./FarmPlacementPreview";
 import { FarmTravel } from "./FarmTravel";
@@ -67,6 +69,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private readonly travel: FarmTravel;
+	private readonly barn: FarmBarn;
 	private readonly fishing: FarmFishing;
 	private readonly onOpenHouse: () => void;
 	private train!: TrainController;
@@ -96,6 +99,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			onAreaChange,
 			onOpenTravel,
 		);
+		this.barn = new FarmBarn(isOwner);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -132,13 +136,15 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			player: this.player,
 			blocks: this.blocks,
 			farmProps: this.farmProps,
+			barn: this.barn,
 			placement: this.placement,
 			fencePlacement: this.fencePlacement,
 			sprinklerPlacement: this.sprinklerPlacement,
-			canEdit: () => this.canEdit(),
+			canEdit: () => canEditFarm(useGameStore.getState().activeFarm, this.isOwner),
+			canRearrangeProps: () => canRearrangeProps(this.isOwner),
 			isDeactivated: () => this.deactivated,
 			report: (message) => this.report(message),
-			reportReadOnly: () => this.reportReadOnly(),
+			reportReadOnly: () => this.report("The owner has visitor editing off."),
 			updateHover: (pos) => this.updateHover(pos),
 			performAction: (column, row) => this.performAction(column, row),
 		});
@@ -149,8 +155,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	}
 
 	setHeldTool(tool: FarmToolId | null): void {
-		this.message = tool ? TOOL_HINTS[tool] : "Select a tool or item first.";
-		this.emitHud();
+		this.report(tool ? TOOL_HINTS[tool] : "Select a tool or item first.");
 	}
 
 	/** The hotbar reports a slot change so the combo tracker grants its grace. */
@@ -207,8 +212,9 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.presence?.update(step);
 
 		// Freeze and hide the player while the inventory modal captures input,
-		// while a farmhouse/train menu is open, while the fishing overlay is
-		// open, or while the train carries them.
+		// while a farmhouse/train/barn menu is open, while the fishing overlay
+		// is open, or while the train carries them. Swallow interact presses so
+		// closing an overlay doesn't immediately reopen the barn.
 		if (
 			this.paused ||
 			isInventoryBlockingInput() ||
@@ -217,6 +223,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		) {
 			this.player.vel = ex.vec(0, 0);
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
+			this.inputManager.consumePress("KeyE", "Enter");
 			return;
 		}
 
@@ -231,18 +238,24 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			this.player,
 			this.inputManager,
 			this.train,
-			gate?.prompt ?? null,
+			gate?.prompt ?? this.barn.prompt(this.player, this.farmProps),
 			housePrompt,
 			this.onOpenHouse,
 		);
 		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
 			toggleGate(this.owner, gate.gate, (message) => this.report(message));
 		}
+		// The barn claims E before fishing drains it, but only while in reach.
+		this.barn.update(this.player, this.inputManager, this.farmProps);
 		this.fishing.update(this.player.pos.y, this.inputManager);
 
-		if (this.canEdit()) farmActionOnSpace(this.inputManager, this.player.pos,
+		if (canEditFarm(farm, this.isOwner)) farmActionOnSpace(this.inputManager, this.player.pos,
 			(column, row) => this.performAction(column, row));
-		this.syncTilesFromServer();
+		const changed = this.tileSync.sync(useGameStore.getState().activeFarm);
+		if (changed) {
+			if (this.lastWorldPos) this.updateHover(this.lastWorldPos);
+			else this.emitHud();
+		}
 		this.tileSync.syncGrowing(useGameStore.getState().activeFarm, Date.now());
 		this.sweepFx.update(step);
 		this.combo.update();
@@ -288,14 +301,6 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		useComboStore.getState().clearCombo();
 	}
 
-	private canEdit(): boolean {
-		return canEditFarm(useGameStore.getState().activeFarm, this.isOwner);
-	}
-
-	private reportReadOnly(): void {
-		this.report("The owner has visitor editing off.");
-	}
-
 	private housePrompt(): string | null {
 		if (!this.isOwner) return null;
 		const house = this.farmProps.position("farmhouse");
@@ -314,13 +319,6 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private report(text: string): void {
 		this.message = text;
 		this.emitHud();
-	}
-
-	private syncTilesFromServer(): void {
-		const changed = this.tileSync.sync(useGameStore.getState().activeFarm);
-		if (!changed) return;
-		if (this.lastWorldPos) this.updateHover(this.lastWorldPos);
-		else this.emitHud();
 	}
 
 	private updateHover(worldPos: ex.Vector): void {

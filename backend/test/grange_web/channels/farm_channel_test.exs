@@ -4,7 +4,7 @@ defmodule GrangeWeb.FarmChannelTest do
 
   import Grange.FarmFixtures
 
-  alias Grange.{Accounts, Farm, FarmStore, Inventory}
+  alias Grange.{Accounts, Farm, FarmStore, Inventory, Repo}
   alias GrangeWeb.ChannelCase, as: Helper
   alias GrangeWeb.Presence
 
@@ -141,6 +141,35 @@ defmodule GrangeWeb.FarmChannelTest do
     assert reply.error == "not your farm"
   end
 
+  test "an admin can rearrange another player's props" do
+    public_farm("Alice")
+
+    admin =
+      Helper.register_user("Root")
+      |> Ecto.Changeset.change(is_admin: true)
+      |> Repo.update!()
+
+    {:ok, _reply, socket} =
+      socket(GrangeWeb.UserSocket, admin.id, %{user: admin})
+      |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref = push(socket, "farmPropAction", %{"action" => %{"kind" => "dig", "index" => 2}})
+    assert_reply(ref, :ok)
+    assert_broadcast("farmUpdate", %{farm: %{prop_overrides: overrides}})
+    assert Enum.any?(overrides, &(&1.index == 2 and &1.carried))
+  end
+
+  test "a non-admin visitor cannot move props" do
+    public_farm("Alice")
+
+    {:ok, _reply, socket} =
+      signed_socket("Bob") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref = push(socket, "farmPropAction", %{"action" => %{"kind" => "dig", "index" => 2}})
+    assert_reply(ref, :error, reply)
+    assert reply.error == "not your farm"
+  end
+
   test "the owner can sell produce" do
     full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 1, "y" => 1})
@@ -161,6 +190,44 @@ defmodule GrangeWeb.FarmChannelTest do
     {:ok, _reply, socket} = join_farm("Bob", "Alice")
 
     ref = push(socket, "sellProduce", %{"item" => "tomato", "count" => 1})
+    assert_reply(ref, :error, reply)
+    assert reply.error == "not your farm"
+  end
+
+  test "the owner can store and retrieve items from the barn" do
+    FarmStore.ensure("Alice")
+
+    {:ok, _reply, socket} =
+      signed_socket("Alice") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref =
+      push(socket, "barnAction", %{
+        "action" => %{"kind" => "deposit", "item" => "tomato", "count" => 2}
+      })
+
+    assert_reply(ref, :ok)
+    assert_broadcast("farmUpdate", %{farm: %{storage: %{"tomato" => 2}}})
+
+    ref =
+      push(socket, "barnAction", %{
+        "action" => %{"kind" => "withdraw", "item" => "tomato", "count" => 1}
+      })
+
+    assert_reply(ref, :ok)
+    assert_broadcast("farmUpdate", %{farm: %{storage: %{"tomato" => 1}}})
+  end
+
+  test "a visitor cannot touch the barn" do
+    public_farm("Alice")
+
+    {:ok, _reply, socket} =
+      signed_socket("Bob") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref =
+      push(socket, "barnAction", %{
+        "action" => %{"kind" => "deposit", "item" => "tomato", "count" => 1}
+      })
+
     assert_reply(ref, :error, reply)
     assert reply.error == "not your farm"
   end

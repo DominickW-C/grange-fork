@@ -280,7 +280,8 @@ Client events:
 | --- | --- | --- | --- | --- |
 | `farmAction` | `{action: FarmAction}` | owner, or visitor while `visitor_edit` | `{seeds, drops}` | `{error, seeds}` |
 | `gateAction` | `{action: {kind: "toggle_gate", x, y}}` | any joined user | `:ok` | `{error: reason}` |
-| `farmPropAction` | `{action: {kind: "dig", index} \| {kind: "place", asset, x, y}}` | owner, or visitor while `visitor_edit` | `:ok` | `{error: reason}` |
+| `farmPropAction` | `{action: {kind: "dig", index} \| {kind: "place", asset, x, y}}` | owner, or visitor while `visitor_edit`, or any admin | `:ok` | `{error: reason}` |
+| `barnAction` | `{action: {kind: "deposit" \| "withdraw", item, count}}` | farm owner only | `:ok` | `{error: reason}` |
 | `sellProduce` | `{item: cropId, count: integer}` | farm owner only | `:ok` | `{error: reason}` |
 | `updateSettings` | `{is_public?, visitor_edit?}` | farm owner only | `{farm}` | `{error: reason}` |
 | `move` | `{x, y}` | any joined user | `:ok` | `{error: "move ignored"}` |
@@ -300,8 +301,9 @@ Authorization rules (`FarmChannel`):
   in-flight action immediately.
 - Visitors may always toggle gates; placing/removing fences and gates is an
   edit action.
-- Prop actions, produce sales, and settings are owner-only (with the same
-  `visitor_edit` gate for props).
+- Prop actions follow the same `visitor_edit` gate, and admins may rearrange
+  props on any farm they can join.
+- Barn storage actions, produce sales, and settings are owner-only.
 - Seed spending and mutation drops follow the actor; harvested produce goes to
   the owner's barn.
 
@@ -548,7 +550,7 @@ not rendered UI.
 | --- | --- | --- |
 | `users` | `id` string PK, `username` unique, `email` unique, `password_hash`, `balance` default 100, `is_admin` default false, `inserted_at` | IDs are 32-char lowercase hex strings. No `updated_at`. |
 | `sessions` | `token_hash` string PK, `user_id` FK → `users.id`, `expires_at`, `inserted_at` | Only the SHA-256 hash is stored. |
-| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `sprinkler_count` default 0, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. |
+| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `storage` JSON map default `{}`, `sprinkler_count` default 0, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. `storage` is the barn-storage container (`BarnStorage`), separate from `barn_items`. |
 | `tiles` | `id`, `owner` FK → `farms.owner`, `x`, `y`, `state` string, `crop` string, `planted_at`/`watered_at`/`ready_at`/`tilled_at` integer ms | Unique `(owner, x, y)`. `state` is one of `tilled`, `planted`, `watered`, `ready`. `tilled_at` is set while the tile is bare `tilled` ground so `FarmTick` can revert abandoned soil to grass. |
 | `barn_items` | `owner` FK, `item`, `count` | Unique `(owner, item)`. `item` is a crop id. |
 | `farm_fences` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. |

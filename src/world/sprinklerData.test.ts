@@ -14,6 +14,7 @@ function farm(overrides: Partial<ActiveFarm> = {}): ActiveFarm {
 		tiles: [],
 		tomatoes: 0,
 		barn: {},
+		storage: {},
 		animals: {},
 		land_level: 4,
 		is_public: false,

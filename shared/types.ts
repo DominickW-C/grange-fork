@@ -73,11 +73,19 @@ export interface ActiveFarm {
 		carried: boolean;
 	}>;
 	prop_inventory: Record<string, number>;
+	storage: Record<string, number>;
 }
 
 export type FarmPropAction =
 	| { kind: "dig"; index: number }
 	| { kind: "place"; asset: string; x: number; y: number };
+
+/** A deposit into or withdrawal from a farm's barn storage. */
+export interface BarnAction {
+	kind: "deposit" | "withdraw";
+	item: string;
+	count: number;
+}
 
 /** A visitor-safe request to open or close a gate. */
 export interface FarmGateAction {
