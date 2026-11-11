@@ -34,10 +34,11 @@ defmodule GrangeWeb.Router do
 
     get("/state", HealthController, :state)
 
-    # Test hook: lets e2e runs start from a clean slate. Compiled out of
-    # production builds.
+    # Test hooks: let e2e runs start from a clean slate and jump the farmhand
+    # quest forward. Compiled out of production builds.
     if Application.compile_env(:grange, :enable_test_routes, false) do
       post("/reset", HealthController, :reset)
+      post("/dev/npc", DevController, :npc)
     end
   end
 

@@ -23,12 +23,21 @@ export class FarmTravel {
 		input: InputManager,
 		train: TrainController,
 		gatePrompt: string | null = null,
+		npcPrompt: string | null = null,
+		onTalkToNpc: (() => void) | null = null,
 		housePrompt: string | null = null,
 		onOpenHouse: (() => void) | null = null,
 	): void {
 		// A nearby gate owns the prompt and the E key while it is in range.
 		if (gatePrompt) {
 			this.setPrompt(gatePrompt);
+			return;
+		}
+		// The farmhand stands beside the house, so he gets first claim on E
+		// before the house menu.
+		if (npcPrompt && onTalkToNpc) {
+			this.setPrompt(npcPrompt);
+			if (input.consumePress("KeyE", "Enter")) onTalkToNpc();
 			return;
 		}
 		if (housePrompt && onOpenHouse) {

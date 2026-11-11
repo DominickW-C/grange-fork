@@ -5,6 +5,7 @@ import type {
 	FarmGateAction,
 	FarmPropAction,
 	FarmSummary,
+	NpcQuestStatus,
 	Player,
 } from "../shared/types";
 import { countItem, useInventoryStore } from "./inventory/inventoryStore";
@@ -12,6 +13,7 @@ import { reconcileServerItems } from "./inventory/itemSync";
 import type { ItemId } from "./inventory/items";
 import { useGameStore } from "./store";
 import { attachFarmPresence, resetFarmPresence } from "./world/farmPresence";
+import { useNpcStore } from "./world/npcStore";
 
 /** Session token used to authenticate the socket handshake. */
 let authToken: string | null = null;
@@ -38,6 +40,8 @@ export interface FarmAck extends Ack {
 export interface FarmActionAck extends Ack {
 	seeds?: Record<string, number>;
 	drops?: string[];
+	npc?: NpcQuestStatus;
+	balance?: number;
 }
 
 export interface FarmSettings {
@@ -50,7 +54,7 @@ let lobby: Channel | null = null;
 let farmChannel: Channel | null = null;
 let farmOwner: string | null = null;
 
-function reasonOf(payload: unknown): string | undefined {
+export function reasonOf(payload: unknown): string | undefined {
 	if (payload && typeof payload === "object") {
 		if ("error" in payload)
 			return String((payload as { error?: unknown }).error);
@@ -146,14 +150,25 @@ export function emitVisitFarm(
 		useGameStore.getState().setActiveFarm(farm);
 	});
 
+	// Dev/test builds can jump the farmhand quest; keep the mirror in step.
+	channel.on("npcUpdate", (payload: unknown) => {
+		const { npc } = payload as { npc?: NpcQuestStatus | null };
+		useNpcStore.getState().setStatus(npc ?? null);
+	});
+
 	channel
 		.join()
 		.receive("ok", (payload: unknown) => {
-			const { farm } = payload as { farm: ActiveFarm };
+			const { farm, npc } = payload as {
+				farm: ActiveFarm;
+				npc?: NpcQuestStatus | null;
+			};
 			const previous = farmChannel;
 			farmChannel = channel;
 			farmOwner = owner;
 			useGameStore.getState().setActiveFarm(farm);
+			// Visitors get `npc: nil`, which hides the farmhand entirely.
+			useNpcStore.getState().setStatus(npc ?? null);
 			// Leaving the old channel drops this socket's subscription.
 			if (previous && previous !== channel) previous.leave();
 			attachFarmPresence(channel);
@@ -186,6 +201,7 @@ function leaveFarmChannel(clearFarm: boolean): void {
 	farmChannel = null;
 	farmOwner = null;
 	resetFarmPresence();
+	useNpcStore.getState().setStatus(null);
 	channel?.leave();
 	if (clearFarm) useGameStore.getState().setActiveFarm(null);
 }
@@ -306,6 +322,11 @@ export function emitSellProduce(
 			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not sell" }),
 		)
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
+}
+
+/** The joined farm channel when it belongs to `owner`, else null. */
+export function farmChannelFor(owner: string): Channel | null {
+	return farmChannel && farmOwner === owner ? farmChannel : null;
 }
 
 /** Registers global handlers and opens the lobby channel. */

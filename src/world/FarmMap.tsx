@@ -27,6 +27,7 @@ import { HouseMenu } from "./HouseMenu";
 import { leaveHub, subscribeHubPeers } from "./hubClient";
 import type { MarketplaceScene } from "./MarketplaceScene";
 import { MarketWindow } from "./MarketWindow";
+import { NpcTradeWindow } from "./NpcTradeWindow";
 import type { LivestockMarketScene } from "./LivestockMarketScene";
 import { LivestockPurchaseOverlay } from "./LivestockPurchaseOverlay";
 import { MARKETS } from "./marketData";
@@ -36,8 +37,12 @@ import { useWorldEngine } from "./useWorldEngine";
 import { useWorldTravel } from "./useWorldTravel";
 import { useBarnReconcile } from "./useBarnReconcile";
 import { useFarmMarket } from "./useFarmMarket";
-import { useFarmItemNotices, useFarmObjectInventory } from "./useFarmObjectInventory";
+import {
+	useFarmItemNotices,
+	useFarmObjectInventory,
+} from "./useFarmObjectInventory";
 import { useLivestockPurchase } from "./useLivestockPurchase";
+import { useNpcTrade } from "./useNpcTrade";
 import type { WorldArea } from "./WalkingScene";
 
 export default function FarmMap() {
@@ -123,13 +128,28 @@ export default function FarmMap() {
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 	const [hubPeers, setHubPeers] = useState<string[]>([]);
 	const [farmPeers, setFarmPeers] = useState<string[]>([]);
-	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(null);
+	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(
+		null,
+	);
 	const [bankDesk, setBankDesk] = useState<BankDesk | null>(null);
 	const livestock = useLivestockPurchase(isOwner, username);
 	const { select: selectAnimal, setMessage: setLivestockMessage } = livestock;
 	const [fishingOpen, setFishingOpen] = useState(false);
 	const [engineReady, setEngineReady] = useState(false);
 	const { houseOpen, openHouseMenu, closeHouseMenu } = useHouseMenu(sceneRef);
+	const {
+		status: npcStatus,
+		npcOpen,
+		npcMessage,
+		npcThanks,
+		npcBusy,
+		openNpc,
+		closeNpc,
+		acknowledgeIntro,
+		dismissThanks,
+		sell: sellToNpc,
+		buySeeds: buyNpcSeeds,
+	} = useNpcTrade(sceneRef, target, isOwner);
 	const { openFarmTravelMenu, openMarketplaceTravelMenu } = useWorldTravel({
 		target,
 		username,
@@ -167,6 +187,7 @@ export default function FarmMap() {
 		setCasinoOverlay,
 		setFishingOpen,
 		openHouseMenu,
+		openNpcTrade: openNpc,
 		openFarmTravelMenu,
 		openMarketplaceTravelMenu,
 	});
@@ -232,6 +253,7 @@ export default function FarmMap() {
 			data-world-ready={worldReady ? "true" : "false"}
 			data-hub-peers={hubPeers.join(",")}
 			data-farm-peers={farmPeers.join(",")}
+			data-npc-stage={npcStatus?.stage ?? "none"}
 		>
 			<canvas
 				ref={canvasRef}
@@ -257,7 +279,9 @@ export default function FarmMap() {
 					onClose={closeLivestockPurchase}
 				/>
 			)}
-			{bankDesk && <BankWindow desk={bankDesk} isOwner={isOwner} onClose={closeBank} />}
+			{bankDesk && (
+				<BankWindow desk={bankDesk} isOwner={isOwner} onClose={closeBank} />
+			)}
 			{travelPrompt && (
 				<div className="farm-map-travel-prompt" data-testid="travel-prompt">
 					{travelPrompt}
@@ -281,6 +305,20 @@ export default function FarmMap() {
 			{paused && <PauseMenu />}
 			{houseOpen && isOwner && farm && (
 				<HouseMenu owner={target ?? ""} farm={farm} onClose={closeHouseMenu} />
+			)}
+			{npcOpen && npcStatus && (
+				<NpcTradeWindow
+					status={npcStatus}
+					barn={farm?.barn ?? {}}
+					message={npcMessage}
+					thanks={npcThanks}
+					busy={npcBusy}
+					onClose={closeNpc}
+					onAcknowledge={acknowledgeIntro}
+					onDismissThanks={dismissThanks}
+					onSell={sellToNpc}
+					onBuySeeds={buyNpcSeeds}
+				/>
 			)}
 			<TravelMenu />
 			{fishingOpen && <FishingOverlay onClose={closeFishing} />}

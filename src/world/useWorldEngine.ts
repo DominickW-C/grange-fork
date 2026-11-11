@@ -59,6 +59,7 @@ interface SceneCallbacks {
 	setCasinoOverlay: (overlay: CasinoOverlay | null) => void;
 	setFishingOpen: (open: boolean) => void;
 	openHouseMenu: () => void;
+	openNpcTrade: () => void;
 	openFarmTravelMenu: () => void;
 	openMarketplaceTravelMenu: () => void;
 }
@@ -89,6 +90,7 @@ export function useWorldEngine(
 		setCasinoOverlay,
 		setFishingOpen,
 		openHouseMenu,
+		openNpcTrade,
 		openFarmTravelMenu,
 		openMarketplaceTravelMenu,
 	} = options;
@@ -120,6 +122,7 @@ export function useWorldEngine(
 				setFishingOpen(true);
 			},
 			openHouseMenu,
+			openNpcTrade,
 			openFarmTravelMenu,
 		);
 		scene.onFarmUpdate = (snapshot) => {
@@ -224,6 +227,7 @@ export function useWorldEngine(
 		setCasinoOverlay,
 		setFishingOpen,
 		openHouseMenu,
+		openNpcTrade,
 		openFarmTravelMenu,
 		openMarketplaceTravelMenu,
 	]);

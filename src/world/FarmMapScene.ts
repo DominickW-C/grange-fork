@@ -14,6 +14,9 @@ import { selectedFarmItem } from "./fenceActions";
 import { performFarmAction } from "./farmActionRunner";
 import { FarmPropLayer } from "./farmPropLayer";
 import { FarmPlacementPreview } from "./FarmPlacementPreview";
+import { FarmNpc } from "./farmNpc";
+import { npcAnchor, npcPrompt } from "./farmNpcPosition";
+import { shouldShowNpc } from "./npcStore";
 import { FarmTravel } from "./FarmTravel";
 import { FarmFishing } from "./farmFishing";
 import { canEditFarm } from "./farmPermissions";
@@ -65,6 +68,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private readonly travel: FarmTravel;
 	private readonly fishing: FarmFishing;
 	private readonly onOpenHouse: () => void;
+	private readonly onTalkToNpc: () => void;
+	private npc?: FarmNpc;
 	private train!: TrainController;
 	private presence?: FarmScenePresence;
 	private paused = false;
@@ -78,10 +83,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		onAreaChange: (area: WorldArea) => void,
 		onFish: () => void,
 		onOpenHouse: () => void,
+		onTalkToNpc: () => void,
 		onOpenTravel: () => void,
 	) {
 		super();
 		this.onOpenHouse = onOpenHouse;
+		this.onTalkToNpc = onTalkToNpc;
 		this.fishing = new FarmFishing(
 			isOwner,
 			onFish,
@@ -121,6 +128,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 		this.player = createFarmPlayer(this);
 		this.presence = new FarmScenePresence(this, this.player);
+		this.npc = new FarmNpc(this);
 
 		this.toolInput = new FarmToolInput({
 			owner: this.owner,
@@ -212,12 +220,18 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		updateFarmerGraphics(this.player, dir);
 
 		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
+		const npc = shouldShowNpc(this.isOwner)
+			? npcAnchor(this.farmProps.position("farmhouse"))
+			: null;
+		this.npc?.place(npc);
 		const housePrompt = this.housePrompt();
 		this.travel.update(
 			this.player,
 			this.inputManager,
 			this.train,
 			gate?.prompt ?? null,
+			npcPrompt(this.player.pos, npc),
+			this.onTalkToNpc,
 			housePrompt,
 			this.onOpenHouse,
 		);
