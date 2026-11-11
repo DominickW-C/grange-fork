@@ -53,6 +53,13 @@ export interface FarmSettings {
 let lobby: Channel | null = null;
 let farmChannel: Channel | null = null;
 let farmOwner: string | null = null;
+/**
+ * A pause requested while the farm join was still in flight. The presence is
+ * attached on join, so the pause has to be remembered and applied then;
+ * otherwise a player who boots straight into a hub leaves an avatar idling on
+ * their farm.
+ */
+let farmPresencePaused = false;
 
 export function reasonOf(payload: unknown): string | undefined {
 	if (payload && typeof payload === "object") {
@@ -132,17 +139,29 @@ export function requestFarms(): void {
 		});
 }
 
+/**
+ * Joins the farm channel for `owner` and (optionally) publishes presence.
+ *
+ * `presence` is false when the world boots straight into a hub: the SPA still
+ * needs the farm snapshot for the HUD and `data-world-ready`, but the player
+ * is not standing on the farm.
+ */
 export function emitVisitFarm(
 	owner: string,
 	cb?: (res: FarmAck) => void,
+	presence = true,
 ): void {
 	if (farmChannel && farmOwner === owner) {
-		attachFarmPresence(farmChannel);
-		farmChannel.push("resumePresence", {});
+		if (presence) {
+			farmPresencePaused = false;
+			attachFarmPresence(farmChannel);
+			farmChannel.push("resumePresence", {});
+		}
 		cb?.({ ok: true });
 		return;
 	}
 
+	farmPresencePaused = !presence;
 	const channel = socket.channel(`farm:${owner}`, {});
 
 	channel.on("farmUpdate", (payload: unknown) => {
@@ -171,7 +190,12 @@ export function emitVisitFarm(
 			useNpcStore.getState().setStatus(npc ?? null);
 			// Leaving the old channel drops this socket's subscription.
 			if (previous && previous !== channel) previous.leave();
-			attachFarmPresence(channel);
+			if (farmPresencePaused) {
+				resetFarmPresence();
+				channel.push("pausePresence", {});
+			} else {
+				attachFarmPresence(channel);
+			}
 			cb?.({ ok: true, farm });
 		})
 		.receive("error", (payload: unknown) =>
@@ -191,6 +215,7 @@ export function emitLeaveFarm(cb?: (res: Ack) => void): void {
  * farm snapshot is kept; returning to the farm resumes presence.
  */
 export function emitPauseFarmVisit(cb?: (res: Ack) => void): void {
+	farmPresencePaused = true;
 	resetFarmPresence();
 	farmChannel?.push("pausePresence", {});
 	cb?.({ ok: true });
@@ -200,6 +225,7 @@ function leaveFarmChannel(clearFarm: boolean): void {
 	const channel = farmChannel;
 	farmChannel = null;
 	farmOwner = null;
+	farmPresencePaused = false;
 	resetFarmPresence();
 	useNpcStore.getState().setStatus(null);
 	channel?.leave();
@@ -298,28 +324,6 @@ export function emitFarmPropAction(
 		.receive("ok", () => cb?.({ ok: true }))
 		.receive("error", (payload: unknown) =>
 			cb?.({ ok: false, error: reasonOf(payload) ?? "Invalid object action" }),
-		)
-		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
-}
-
-/** Sells a produce item from the visited farm's barn back to the market. */
-export function emitSellProduce(
-	owner: string,
-	item: string,
-	count: number,
-	cb?: (res: Ack) => void,
-): void {
-	const channel = farmChannel;
-	if (!channel || farmOwner !== owner) {
-		cb?.({ ok: false, error: "not visiting farm" });
-		return;
-	}
-
-	channel
-		.push("sellProduce", { item, count })
-		.receive("ok", () => cb?.({ ok: true }))
-		.receive("error", (payload: unknown) =>
-			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not sell" }),
 		)
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }

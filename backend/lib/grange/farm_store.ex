@@ -17,6 +17,7 @@ defmodule Grange.FarmStore do
   alias Grange.{
     Barn,
     BarnItem,
+    BarnStorage,
     Crops,
     Farm,
     FarmAction,
@@ -29,7 +30,11 @@ defmodule Grange.FarmStore do
     FarmProps,
     FarmRecord,
     FarmSettings,
+    FarmSprinkler,
+    FarmSprinklers,
+    FarmTick,
     FarmView,
+    FieldWater,
     Inventory,
     InventoryItem,
     InventorySlot,
@@ -40,8 +45,6 @@ defmodule Grange.FarmStore do
   }
 
   @lobby_topic "lobby"
-  @orthogonal [{0, -1}, {0, 1}, {1, 0}, {-1, 0}]
-  @growing [:planted, :watered, :ready]
 
   @spec ensure(String.t()) :: map()
   def ensure(owner) do
@@ -74,12 +77,15 @@ defmodule Grange.FarmStore do
           fence_count: farm.fence_count,
           gates: FarmGates.list(owner),
           gate_count: farm.gate_count,
+          sprinklers: FarmSprinklers.list(owner),
+          sprinkler_count: farm.sprinkler_count,
           animals: farm.animals,
           land_level: farm.land_level,
           is_public: farm.is_public,
           visitor_edit: farm.visitor_edit,
           prop_overrides: FarmProps.overrides(owner),
-          prop_inventory: FarmProps.inventory(owner)
+          prop_inventory: FarmProps.inventory(owner),
+          storage: BarnStorage.inventory(farm)
         }
     end
   end
@@ -144,15 +150,7 @@ defmodule Grange.FarmStore do
 
   @spec tick(integer()) :: [String.t()]
   def tick(now \\ System.system_time(:millisecond)) do
-    ready =
-      Repo.all(
-        from(t in Tile,
-          where: t.state == :watered and not is_nil(t.ready_at) and t.ready_at <= ^now
-        )
-      )
-
-    owners = ready |> Enum.map(& &1.owner) |> Enum.uniq() |> Enum.sort()
-    Enum.each(ready, &Repo.update!(Ecto.Changeset.change(&1, state: :ready)))
+    owners = FarmTick.run(now)
     Enum.each(owners, &broadcast_farm/1)
     if owners != [], do: broadcast_lobby()
     owners
@@ -169,6 +167,7 @@ defmodule Grange.FarmStore do
       InventorySlot,
       FarmFence,
       FarmGate,
+      FarmSprinkler,
       FarmProp,
       Grange.NpcQuestRecord,
       FarmRecord
@@ -208,7 +207,7 @@ defmodule Grange.FarmStore do
   defp mutate(owner, _actor, :till, x, y, _opts) do
     case tile_at(owner, x, y) do
       nil ->
-        %Tile{}
+        %Tile{tilled_at: now_ms()}
         |> Tile.changeset(%{owner: owner, x: x, y: y, state: :tilled, crop: "tomato"})
         |> Repo.insert!()
 
@@ -231,6 +230,10 @@ defmodule Grange.FarmStore do
   defp mutate(owner, _actor, :remove_gate, x, y, _opts),
     do: reorient_gates(owner, FarmGates.remove(owner, x, y))
 
+  defp mutate(owner, _actor, kind, x, y, _opts)
+       when kind in [:place_sprinkler, :remove_sprinkler],
+       do: FarmSprinklers.action(owner, kind, x, y)
+
   defp mutate(owner, actor, kind, x, y, opts) do
     case tile_at(owner, x, y) do
       nil -> {:error, "no tilled tile here"}
@@ -251,14 +254,8 @@ defmodule Grange.FarmStore do
     end
   end
 
-  defp transform(owner, _actor, tile, :water, _opts) do
-    {crop_id, _remaining} = Crops.parse_crop(tile.crop)
-    speed = Crops.growth_speed_multiplier(crop_id, neighbor_families(owner, tile.x, tile.y))
-
-    with {:ok, watered} <- Farm.water(tile, now_ms(), Farm.grow_ms() / speed) do
-      update_tile(tile, watered)
-    end
-  end
+  defp transform(owner, _actor, tile, :water, _opts),
+    do: FieldWater.water(owner, tile, now_ms())
 
   defp transform(owner, actor, tile, :harvest, opts) do
     {crop_id, remaining} = Crops.parse_crop(tile.crop)
@@ -269,7 +266,7 @@ defmodule Grange.FarmStore do
 
       Crops.can_harvest?(crop_id, opts[:tool]) ->
         Barn.add(owner, crop_id, 1)
-        families = neighbor_families(owner, tile.x, tile.y)
+        families = FieldWater.neighbor_families(owner, tile.x, tile.y)
         drops = FarmAction.mutation_drops(crop_id, tile.state, families, opts, :rand.uniform())
         Enum.each(drops, &Inventory.add(actor, &1, 1))
         regrow_or_clear(owner, tile, crop_id, remaining)
@@ -284,7 +281,12 @@ defmodule Grange.FarmStore do
     crop_def = Crops.get(crop_id)
 
     if remaining > 1 and crop_def[:regrow_stage] >= 0 do
-      speed = Crops.growth_speed_multiplier(crop_id, neighbor_families(owner, tile.x, tile.y))
+      speed =
+        Crops.growth_speed_multiplier(
+          crop_id,
+          FieldWater.neighbor_families(owner, tile.x, tile.y)
+        )
+
       now = now_ms()
 
       tile
@@ -292,7 +294,8 @@ defmodule Grange.FarmStore do
         state: :watered,
         crop: Crops.encode_crop(crop_id, remaining - 1),
         watered_at: now,
-        ready_at: now + round(Farm.grow_ms() / speed)
+        ready_at: now + round(Farm.grow_ms() / speed),
+        tilled_at: nil
       })
       |> Repo.update!()
 
@@ -312,21 +315,12 @@ defmodule Grange.FarmStore do
       crop: changed.crop,
       planted_at: changed.planted_at,
       watered_at: changed.watered_at,
-      ready_at: changed.ready_at
+      ready_at: changed.ready_at,
+      tilled_at: if(changed.state == :tilled, do: now_ms(), else: nil)
     })
     |> Repo.update!()
 
     :ok
-  end
-
-  defp neighbor_families(owner, x, y) do
-    for {dx, dy} <- @orthogonal,
-        tile = tile_at(owner, x + dx, y + dy),
-        tile != nil,
-        tile.state in @growing do
-      {crop_id, _remaining} = Crops.parse_crop(tile.crop)
-      Crops.family(crop_id)
-    end
   end
 
   @kinds %{
@@ -337,7 +331,9 @@ defmodule Grange.FarmStore do
     "place_fence" => :place_fence,
     "remove_fence" => :remove_fence,
     "place_gate" => :place_gate,
-    "remove_gate" => :remove_gate
+    "remove_gate" => :remove_gate,
+    "place_sprinkler" => :place_sprinkler,
+    "remove_sprinkler" => :remove_sprinkler
   }
 
   defp normalize(action) when is_map(action) do
@@ -375,9 +371,8 @@ defmodule Grange.FarmStore do
     broadcast_lobby()
   end
 
-  defp broadcast_farm(owner) do
-    GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
-  end
+  defp broadcast_farm(owner),
+    do: GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
 
   defp broadcast_lobby do
     GrangeWeb.Endpoint.broadcast(@lobby_topic, "farms", %{farms: summaries()})

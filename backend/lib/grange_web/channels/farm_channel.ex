@@ -6,11 +6,23 @@ defmodule GrangeWeb.FarmChannel do
   only while the owner has enabled visitor editing. Identity comes from the
   session, never the client, and the persisted settings are re-checked on every
   action so revoking edit permission takes effect immediately.
+
+  Admins may also rearrange props on any farm, and the owner manages the barn
+  through the `barnAction` event.
   """
 
   use Phoenix.Channel
 
-  alias Grange.{FarmGateActions, FarmSettings, FarmStore, Inventory, NpcQuest, WorldPosition}
+  alias Grange.{
+    BarnStorage,
+    FarmGateActions,
+    FarmSettings,
+    FarmStore,
+    Inventory,
+    NpcQuest,
+    WorldPosition
+  }
+
   alias GrangeWeb.Presence
 
   # A client sends at ~10 Hz; this only guards against abusive or buggy loops.
@@ -93,7 +105,12 @@ defmodule GrangeWeb.FarmChannel do
 
   @impl true
   def handle_in("farmPropAction", %{"action" => action}, socket) do
-    authorize_edit(socket, fn owner, _actor -> prop_act(socket, owner, action) end)
+    authorize_prop(socket, fn owner -> prop_act(socket, owner, action) end)
+  end
+
+  @impl true
+  def handle_in("barnAction", %{"action" => action}, socket) do
+    authorize_owner(socket, fn owner -> barn_act(socket, owner, action) end)
   end
 
   @impl true
@@ -169,7 +186,7 @@ defmodule GrangeWeb.FarmChannel do
     end
   end
 
-  # Settings and barn sales always stay with the owner.
+  # Settings, barn actions, and sales always stay with the owner.
   defp authorize_owner(socket, handler) do
     owner = socket.assigns[:owner]
     user = socket.assigns[:user]
@@ -178,6 +195,21 @@ defmodule GrangeWeb.FarmChannel do
       is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
       user.username != owner -> {:reply, {:error, %{error: "not your farm"}}, socket}
       true -> handler.(owner)
+    end
+  end
+
+  # Props are normally the owner's (or an enabled visitor's), but admins may
+  # rearrange buildings on any farm.
+  defp authorize_prop(socket, handler) do
+    owner = socket.assigns[:owner]
+    user = socket.assigns[:user]
+
+    cond do
+      is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
+      user.username == owner -> handler.(owner)
+      user.is_admin -> handler.(owner)
+      FarmStore.edit_allowed?(owner) -> handler.(owner)
+      true -> {:reply, {:error, %{error: "not your farm"}}, socket}
     end
   end
 
@@ -228,6 +260,15 @@ defmodule GrangeWeb.FarmChannel do
 
   defp npc_status(owner, username) when owner == username, do: NpcQuest.status(owner)
   defp npc_status(_owner, _username), do: nil
+
+  defp barn_act(socket, owner, action) do
+    with {:ok, :ok} <- BarnStorage.action(owner, action),
+         {:ok, _farm} <- FarmStore.refresh(owner) do
+      {:reply, :ok, socket}
+    else
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
 
   defp update_settings(socket, owner, payload) do
     case FarmStore.update_settings(owner, payload) do

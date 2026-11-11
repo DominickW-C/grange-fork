@@ -1,8 +1,13 @@
 import type * as ex from "excalibur";
 import type { InputManager } from "./InputManager";
-import { isNearFarmTrain } from "./mapData";
+import { FARM_HOUSE_REACH, isNearFarmTrain } from "./mapData";
 import type { TrainController } from "./train";
 import type { WorldArea } from "./WalkingScene";
+
+interface ScenePosition {
+	x: number;
+	y: number;
+}
 
 export class FarmTravel {
 	private activePrompt: string | null = null;
@@ -12,6 +17,22 @@ export class FarmTravel {
 		private readonly onAreaChange: (area: WorldArea) => void,
 		private readonly onOpenMenu: () => void,
 	) {}
+
+	/**
+	 * The farmhouse prompt when the owner stands close enough to its prop, else
+	 * null. Lives here because this class owns prompt priority.
+	 */
+	housePrompt(
+		isOwner: boolean,
+		player: ScenePosition,
+		house: ScenePosition | null,
+	): string | null {
+		if (!isOwner || !house) return null;
+		const distance = Math.hypot(player.x - house.x, player.y - house.y);
+		return distance <= FARM_HOUSE_REACH
+			? "Press E or Enter to enter the farmhouse"
+			: null;
+	}
 
 	activate(): void {
 		this.onAreaChange("Farm");
@@ -45,7 +66,8 @@ export class FarmTravel {
 			if (input.consumePress("KeyE", "Enter")) onOpenHouse();
 			return;
 		}
-		const canBoard = isNearFarmTrain(player.pos.x, player.pos.y) && train.canBoard();
+		const canBoard =
+			isNearFarmTrain(player.pos.x, player.pos.y) && train.canBoard();
 		this.setPrompt(canBoard ? "Press E or Enter to board the train" : null);
 		if (!canBoard) return;
 		if (!input.consumePress("KeyE", "Enter")) return;

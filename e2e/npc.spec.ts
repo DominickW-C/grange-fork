@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { BASE, registerFast, uniqueName, walkUntilPrompt } from "./helpers";
 
 /**
@@ -14,7 +14,9 @@ async function seedNpc(
 		barn?: Record<string, number>;
 	},
 ): Promise<void> {
-	const response = await page.request.post(`${BASE}/api/dev/npc`, { data: body });
+	const response = await page.request.post(`${BASE}/api/dev/npc`, {
+		data: body,
+	});
 	expect(response.ok(), await response.text()).toBe(true);
 }
 
@@ -39,8 +41,10 @@ test("farmhand walks the player through tomatoes, supplies, and farewell", async
 	page,
 }) => {
 	test.setTimeout(120_000);
-	await registerFast(page, uniqueName("Hand"));
-	await expect(page).toHaveURL(/\/world$/);
+	// Walt's radius is crossed in about a frame at the e2e 3x speed, so walk at
+	// production speed to read his prompt reliably.
+	await registerFast(page, uniqueName("Hand"), { walk: "normal" });
+	await expect(page).toHaveURL(/\/world(?:\?.*)?$/);
 	await seedNpc(page, {
 		stage: "intro",
 		counters: { tomatoes: 0, lettuce: 0, wheat: 0 },
@@ -126,10 +130,14 @@ test("farmhand walks the player through tomatoes, supplies, and farewell", async
 	await expect(page.getByTestId("npc-message")).toContainText("market");
 	await expect(stage(page)).toHaveAttribute("data-npc-stage", "complete");
 
-	// The final line stays readable while he says goodbye, then he is gone.
+	// The final line stays readable while he says goodbye, then he is gone. The
+	// player is standing close enough to the farmhouse as well, so only his own
+	// prompt has to disappear.
 	await page.getByTestId("npc-done").click();
 	await expect(page.getByTestId("npc-window")).toHaveCount(0);
-	await expect(page.getByTestId("travel-prompt")).toHaveCount(0);
+	await expect(
+		page.getByTestId("travel-prompt").filter({ hasText: "talk to Walt" }),
+	).toHaveCount(0);
 
 	// Reloading keeps him gone: the quest is persisted server-side.
 	await page.reload();

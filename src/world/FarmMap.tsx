@@ -25,24 +25,24 @@ import { subscribeFarmPeers } from "./farmPresence";
 import "./farmMap.css";
 import { HouseMenu } from "./HouseMenu";
 import { leaveHub, subscribeHubPeers } from "./hubClient";
-import type { MarketplaceScene } from "./MarketplaceScene";
-import { MarketWindow } from "./MarketWindow";
-import { NpcTradeWindow } from "./NpcTradeWindow";
 import type { LivestockMarketScene } from "./LivestockMarketScene";
 import { LivestockPurchaseOverlay } from "./LivestockPurchaseOverlay";
+import type { MarketplaceScene } from "./MarketplaceScene";
+import { MarketWindow } from "./MarketWindow";
 import { MARKETS } from "./marketData";
+import { NpcTradeWindow } from "./NpcTradeWindow";
 import { TravelMenu } from "./TravelMenu";
-import { useHouseMenu } from "./useHouseMenu";
-import { useWorldEngine } from "./useWorldEngine";
-import { useWorldTravel } from "./useWorldTravel";
 import { useBarnReconcile } from "./useBarnReconcile";
 import { useFarmMarket } from "./useFarmMarket";
 import {
 	useFarmItemNotices,
 	useFarmObjectInventory,
 } from "./useFarmObjectInventory";
+import { useHouseMenu } from "./useHouseMenu";
 import { useLivestockPurchase } from "./useLivestockPurchase";
 import { useNpcTrade } from "./useNpcTrade";
+import { useWorldEngine } from "./useWorldEngine";
+import { useWorldTravel } from "./useWorldTravel";
 import type { WorldArea } from "./WalkingScene";
 
 export default function FarmMap() {
@@ -88,14 +88,18 @@ export default function FarmMap() {
 	useEffect(() => {
 		if (!target) return;
 
-		if (area !== "Farm") {
-			emitPauseFarmVisit();
-			return;
-		}
-
-		emitVisitFarm(target, (res) => {
-			if (!res.ok) navigate("/dashboard", { replace: true });
-		});
+		const onFarm = area === "Farm";
+		// The farm snapshot feeds the HUD and `data-world-ready` even when the
+		// world boots into a hub, so join it first and only then decide whether
+		// the player should publish farm presence.
+		emitVisitFarm(
+			target,
+			(res) => {
+				if (!res.ok) navigate("/dashboard", { replace: true });
+			},
+			onFarm,
+		);
+		if (!onFarm) emitPauseFarmVisit();
 	}, [target, area, navigate]);
 
 	// Unmounting the world must clear the active farm and presence.
@@ -254,6 +258,9 @@ export default function FarmMap() {
 			data-hub-peers={hubPeers.join(",")}
 			data-farm-peers={farmPeers.join(",")}
 			data-npc-stage={npcStatus?.stage ?? "none"}
+			data-sprinklers={(farm?.sprinklers ?? [])
+				.map((s) => `${s.x},${s.y}`)
+				.join(";")}
 		>
 			<canvas
 				ref={canvasRef}

@@ -125,6 +125,7 @@ to Phoenix on `:3200`.
 | `pnpm test` | Vitest, all `**/*.test.ts(x)` |
 | `pnpm test:backend` | ExUnit |
 | `pnpm test:e2e` | Builds the SPA, then Playwright against Phoenix |
+| `pnpm test:e2e:run` | Playwright only, no rebuild (used by CI after `check`) |
 | `pnpm test:e2e:install` | Installs Chromium for Playwright |
 | `pnpm lint` | Biome lint + file-size check + repo sanity |
 | `pnpm lint:backend` | `mix format --check-formatted` + `mix credo --strict` |
@@ -137,7 +138,7 @@ to Phoenix on `:3200`.
 ### Focused test runs
 
 ```sh
-pnpm exec vitest run src/world/farmState.test.ts
+pnpm exec vitest run src/world/farmActions.test.ts
 node scripts/run-mix.mjs test test/grange/crops_test.exs
 pnpm exec playwright test e2e/farm.spec.ts
 ```
@@ -234,6 +235,7 @@ auth is the `_grange_key` cookie; the socket uses the token instead.
 | GET | `/api/auth/me` | cookie | `{ok, user, token}` or 401 |
 | POST | `/api/auth/logout` | cookie | Destroys the session, clears the cookie |
 | POST | `/api/economy/transaction` | cookie | `{delta}` integer; clamped at zero |
+| POST | `/api/hardware/buy` | cookie | `{item, quantity}` → `{balance, sprinkler_count}` |
 | GET | `/api/state` | none | `{playerCount, farmCount}` |
 | POST | `/api/reset` | none | Dev/test only; wipes accounts and farms |
 | POST | `/api/dev/npc` | cookie | Dev/test only; forces farmhand stage/counters and fills the barn |
@@ -285,7 +287,8 @@ Client events:
 | --- | --- | --- | --- | --- |
 | `farmAction` | `{action: FarmAction}` | owner, or visitor while `visitor_edit` | `{seeds, drops}` | `{error, seeds}` |
 | `gateAction` | `{action: {kind: "toggle_gate", x, y}}` | any joined user | `:ok` | `{error: reason}` |
-| `farmPropAction` | `{action: {kind: "dig", index} \| {kind: "place", asset, x, y}}` | owner, or visitor while `visitor_edit` | `:ok` | `{error: reason}` |
+| `farmPropAction` | `{action: {kind: "dig", index} \| {kind: "place", asset, x, y}}` | owner, or visitor while `visitor_edit`, or any admin | `:ok` | `{error: reason}` |
+| `barnAction` | `{action: {kind: "deposit" \| "withdraw", item, count}}` | farm owner only | `:ok` | `{error: reason}` |
 | `sellProduce` | `{item: cropId, count: integer}` | farm owner only | `:ok` | `{error: reason}` |
 | `npcIntroSeen` | `{}` | farm owner only | `{npc}` | `{error: reason}` |
 | `npcSell` | `{item: cropId}` | farm owner only | `{npc, balance}` | `{error: reason}` |
@@ -307,8 +310,9 @@ Authorization rules (`FarmChannel`):
   in-flight action immediately.
 - Visitors may always toggle gates; placing/removing fences and gates is an
   edit action.
-- Prop actions, produce sales, and settings are owner-only (with the same
-  `visitor_edit` gate for props).
+- Prop actions follow the same `visitor_edit` gate, and admins may rearrange
+  props on any farm they can join.
+- Barn storage actions, produce sales, and settings are owner-only.
 - Seed spending and mutation drops follow the actor; harvested produce goes to
   the owner's barn.
 
@@ -405,8 +409,11 @@ animation, and travel to the marketplace.
 
 The Excalibur engine is created as soon as the route has a farm target; the
 world only becomes interactive after the farm channel join supplies
-`activeFarm` (`data-world-ready="true"` requires it). Resources are loaded
-before `engine.start()`, and the scene waits for store updates rather than
+`activeFarm` (`data-world-ready="true"` requires it). Only the boot scene's
+images block the first frame (`worldAssets.ts`): the engine starts once that
+scene can draw, and `preloadWorldResources` warms the other scenes in the
+background. Travel awaits `ensureSceneResources(destination)` so a fast player
+never lands in a blank scene. The scene waits for store updates rather than
 gating engine construction.
 
 DOM overlays (inventory, pause menu, market window, casino game overlays) pause
@@ -486,7 +493,7 @@ not rendered UI.
 │       ├── hubInterpolation.ts← easing/snap helpers (tested)
 │       ├── mapData.ts         ← terrain/props/grid/spawn constants
 │       ├── marketplaceData.ts / casinoData.ts
-│       ├── farmState.ts       ← client-local farm simulation (tests/local)
+│       ├── testMode.ts        ← dev-only e2e hooks (boot scene, walk speed)
 │       ├── farmActions.ts     ← pure action resolution + synergy + drops
 │       ├── farmActionRunner.ts← emit farming actions + combo/sweep
 │       ├── combo* / farmCombo ← combo tracker/controller/store/HUD
@@ -497,7 +504,8 @@ not rendered UI.
 │       ├── NpcTradeWindow / useNpcTrade / npcStore / npcSocket
 │       ├── marketData / useFarmMarket / MarketWindow / seedShop
 │       ├── blackjack*, poker*, roulette*, slots* ← client-side casino games
-│       ├── resources.ts / *Resources.ts ← Excalibur image loading
+│       ├── resources.ts / *Resources.ts ← Excalibur image sources
+│       ├── worldAssets.ts     ← per-scene image groups + lazy loading
 │       └── walkCollisions / sceneObstacles / playerMovement / train
 ├── backend/
 │   ├── mix.exs
@@ -508,6 +516,7 @@ not rendered UI.
 │   │   ├── accounts.ex        ← registration/login/sessions/balance
 │   │   ├── farm_store.ex      ← farm transactions, views, tick, broadcasts
 │   │   ├── farm_ticker.ex     ← 1s GenServer driving FarmStore.tick/0
+│   │   ├── farm_tick.ex       ← per-tick sweep: ripen, revert untended soil
 │   │   ├── farm.ex            ← pure tile state machine + bounds
 │   │   ├── hub.ex             ← hub area whitelist + position clamping
 │   │   ├── crops.ex           ← Elixir mirror of crop registry/mechanics
@@ -553,17 +562,18 @@ not rendered UI.
 | --- | --- | --- |
 | `users` | `id` string PK, `username` unique, `email` unique, `password_hash`, `balance` default 100, `is_admin` default false, `inserted_at` | IDs are 32-char lowercase hex strings. No `updated_at`. |
 | `sessions` | `token_hash` string PK, `user_id` FK → `users.id`, `expires_at`, `inserted_at` | Only the SHA-256 hash is stored. |
-| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. |
-| `tiles` | `id`, `owner` FK → `farms.owner`, `x`, `y`, `state` string, `crop` string, `planted_at`/`watered_at`/`ready_at` integer ms | Unique `(owner, x, y)`. `state` is one of `tilled`, `planted`, `watered`, `ready`. |
+| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `storage` JSON map default `{}`, `sprinkler_count` default 0, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. `storage` is the barn-storage container (`BarnStorage`), separate from `barn_items`. |
+| `tiles` | `id`, `owner` FK → `farms.owner`, `x`, `y`, `state` string, `crop` string, `planted_at`/`watered_at`/`ready_at`/`tilled_at` integer ms | Unique `(owner, x, y)`. `state` is one of `tilled`, `planted`, `watered`, `ready`. `tilled_at` is set while the tile is bare `tilled` ground so `FarmTick` can revert abandoned soil to grass. |
 | `barn_items` | `owner` FK, `item`, `count` | Unique `(owner, item)`. `item` is a crop id. |
 | `farm_fences` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. |
 | `farm_gates` | `owner` FK, `x`, `y`, `direction`, `open` | Unique `(owner, x, y)`. `direction` is `horizontal` or `vertical`. |
+| `farm_sprinklers` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. `(x, y)` is the top-left tile of the watered 2x2; the object is drawn on that 2x2's shared corner. |
 | `farm_props` | `owner` FK, `source_index`, `asset`, `x`, `y`, `carried` | Unique `(owner, source_index)`. Indices map to the starter prop list. |
 | `npc_quests` | `owner` FK, `stage`, `tomatoes_sold`, `lettuce_sold`, `wheat_sold` | One row per farm. `stage` is `intro`, `tomatoes`, `supplies`, or `complete`; counters cap at 10. |
 
 All foreign keys cascade on farm delete. `Accounts.reset/0` deletes sessions
 then users; `FarmStore.reset/0` deletes tiles, barn items, fences, gates,
-props, farmhand quests, then farms.
+sprinklers, props, farmhand quests, then farms.
 
 ### 7.2 Wire types (`shared/types.ts`)
 
@@ -593,6 +603,8 @@ export interface ActiveFarm {
   fence_count: number;
   gates: FenceGate[];
   gate_count: number;
+  sprinklers: FarmSprinkler[];   // anchored by the 2x2's top-left tile
+  sprinkler_count: number;
   prop_overrides: Array<{
     index: number; asset: string; x: number; y: number; carried: boolean;
   }>;
@@ -602,7 +614,8 @@ export interface ActiveFarm {
 export type FarmAction = {
   kind:
     | "till" | "plant" | "water" | "harvest"
-    | "place_fence" | "remove_fence" | "place_gate" | "remove_gate";
+    | "place_fence" | "remove_fence" | "place_gate" | "remove_gate"
+    | "place_sprinkler" | "remove_sprinkler";
   x: number;
   y: number;
   crop?: CropId;                       // plant only
@@ -694,8 +707,8 @@ Hand-harvest vs scythe:
 - A **scythe-only** crop clicked with another tool shows a shake and
   `"<Crop> needs a scythe."`.
 - **Hand or scythe** crops are picked by hand with any non-scythe tool.
-- Each harvest yields **1** produce item (`FARM_HARVEST_YIELD` and
-  `Farm.harvest_yield/0` are legacy and unused).
+- Each harvest yields **1** produce item (`Farm.harvest_yield/0` is legacy and
+  unused).
 - Regrowing crops stay on the tile and reset to their `regrowStage`.
 
 ### 8.2 Grid synergy
@@ -703,9 +716,8 @@ Hand-harvest vs scythe:
 - **Wheat / Midas Wheat — Pack Mentality:** +5% growth speed per adjacent
   growing wheat-family crop, capped at +20%.
 - **Lettuce / Frost-Crisp — Moisture Sponge:** while watered/ready, adjacent
-  crops retain moisture; client simulation applies a 25% slower decay
-  (`LETTUCE_MOISTURE_DECAY_MULTIPLIER`). The server only models the growth
-  multiplier for wheat/tomato (see gaps).
+  crops retain moisture (`LETTUCE_MOISTURE_DECAY_MULTIPLIER`). Neither the
+  server tick nor the client applies it yet (see gaps).
 - **Tomato / Sun-Burst — Space-Hungry:** −20% growth if touching another
   tomato-family crop; +15% if touching lettuce.
 - Positive synergy for mutation rolls:
@@ -747,8 +759,8 @@ chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
 - The client does not roll; it reads `drops` from the ack and shows a
   "Rare <name>!" notice.
 - Sun-Burst Tomato declares a separate 10% bonus seed (`tomato-seed`) in the
-  registry. The client-local simulation (`LocalFarmStore.harvestCrop`) rolls it;
-  the live server harvest path does not.
+  registry, but nothing rolls it: the server harvest path ignores it and the
+  client has no local harvest simulation.
 
 ### 8.5 Fences, gates, and props
 
@@ -772,6 +784,23 @@ chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
   indices live in `FarmProps.@assets`. **Adding or reordering starter props
   requires updating those indices.**
 - Placement uses drag previews and validates terrain/obstacles/collisions.
+- **Sprinklers** are a separate `farm_sprinklers` table, bought at the
+  hardware-market stall in the marketplace (opened as the "Hardware Store"
+  market window; `POST /api/hardware/buy`) and tracked on
+  `farms.sprinkler_count`. A sprinkler is anchored by the top-left tile of a
+  2x2 and drawn on the corner those four tiles share; it may sit on grass or
+  worked (tilled/planted) soil without blocking the tile. While it stands,
+  every planted tile in its square is watered on the next `FarmStore.tick/1`
+  (via `Grange.FieldWater`), so it keeps its 2x2 saturated until it is
+  shoveled up; bare tilled soil in the square is also kept from the till-decay
+  sweep (see 8.7). The client mirrors `sprinkler_count` into the hotbar; the placed
+  sprite is a static green base plus a brass rotor that spins briefly about once
+  a minute with a water spray (`SprinklerLayer`), and it is drawn below the crop
+  layer so a mature plant always renders in front of it.
+- The hardware store stall also **restocks fences and gates** (they spend the
+  farm's supply counts) and sells the basic tools (hoe, watering can, scythe,
+  shovel) as one-off purchases. The tools read as "Owned" because the starter
+  hotbar already grants them.
 
 ### 8.6 Farm visibility and visitor editing
 
@@ -803,7 +832,28 @@ barn. `FarmChannel` authorizes against the persisted flags; the client
 Private farms are omitted from the dashboard's open-farm list and from the
 train destination menu. They are hidden, not shown as locked rows.
 
-### 8.7 Farmhand starter quest
+### 8.7 Tilled soil reverts to grass
+
+Bare tilled ground does not stay tilled forever. `FarmTick.run/1` (called once a
+second by `FarmTicker`) deletes any tile that has sat in the `tilled` state for
+`Farm.till_decay_ms/0` (20 minutes) and then broadcasts the farm and lobby, so
+the client repaints it as grass.
+
+- Only the bare `tilled` state counts down. Planting or watering moves the tile
+  to `planted`/`watered` and clears `tilled_at`, so a planted crop is safe until
+  it is harvested.
+- A harvest that clears the tile back to bare ground stamps a fresh
+  `tilled_at`, restarting the 20-minute window.
+- Soil inside a sprinkler's 2x2 is exempt: `FarmTick` skips any covered tile, so
+  a sprinkler keeps its tilled ground from ever drying out. Placing or lifting a
+  sprinkler restamps the covered tiles' `tilled_at`, so removing one starts a
+  fresh 20-minute window instead of reverting on the next tick.
+- There is no warning UI: the reversion is silent and the client just receives
+  the updated farm. `tilled_at` is server-only and is not sent over the wire.
+- The server owns the rule; the client only repaints what `farmUpdate`
+  delivers.
+
+### 8.8 Farmhand starter quest
 
 A placeholder farmhand (a plain brown rectangle named "Walt") stands beside the
 owner's farmhouse and runs a two-stage selling tutorial. He is owner-only: his
@@ -865,9 +915,9 @@ into the inventory. See `notes/npc-tutorial.md`.
 ### 9.3 Excalibur
 
 - Scenes extend `ex.Scene` or `WalkingScene`.
-- Register new scenes and resources in `FarmMap.tsx`; add image sources to
-  `resources.ts` (or the scene-specific resource module) **before**
-  `engine.start()`.
+- Register new scenes in `FarmMap.tsx`; add image sources to `resources.ts` (or
+  the scene-specific resource module) and to that scene's group in
+  `worldAssets.ts`, or the image renders blank on the first visit.
 - Use `TILE_SIZE`/`MAP_*` constants; do not hard-code 64/1152/768.
 - Use `BlockRegistry`, `walkCollisions`, and `sceneObstacles` instead of ad-hoc
   collision checks.
@@ -875,7 +925,8 @@ into the inventory. See `notes/npc-tutorial.md`.
   (`"Farm map..."` / `"Marketplace map..."` / `"Casino map..."`), and
   `data-testid` values; e2e depends on them.
 - Freeze the scene and hide/freeze the player while a DOM overlay owns input.
-- Load order matters: resources → `engine.start()` → `goToScene`.
+- Load order matters: the boot scene's images (`ensureSceneResources`) →
+  `engine.start()` → `goToScene`. The rest preload behind the first frame.
 - Drive movement, collision steps, and train animation with `FrameClock`
   (`src/world/frameClock.ts`), not the `delta` argument. Excalibur replaces any
   frame longer than 200ms with 1ms, which puts the world into slow motion on a
@@ -907,7 +958,7 @@ When a file nears the cap, extract one coherent concern:
 - Obstacles → `sceneObstacles.ts`, `walkCollisions.ts`
 - Rendering → `cropLayer.ts`, `fenceRendering.ts`, `propLayer.ts`
 - Data → `*Data.ts`, `*Resources.ts`
-- Pure rules → `farmActions.ts`, `farmState.ts`
+- Pure rules → `farmActions.ts`, `farmActionRunner.ts`
 
 Do not add `biome-ignore` comments to dodge lint unless there is a documented
 reason (the repo already has one for a deliberate hook dependency).
@@ -935,51 +986,90 @@ reason (the repo already has one for a deliberate hook dependency).
   `async: true`.
 - `GrangeWeb.ChannelCase` provides `register_user/1` and imports
   `Phoenix.ChannelTest`.
+- `Grange.FarmFixtures` (`backend/test/support/farm_fixtures.ex`) is the
+  shared setup helper: `reset_farm_state/0`, `full_farm/1`, `public_farm/1`,
+  `editable_farm/1`, `set_farm!/2`, `tile_at/3`, `grow/3`. Prefer it over
+  hand-rolled `FarmStore` calls so the tests keep their shape.
 - Tests call `FarmStore.tick/1` directly; the ticker is disabled in test
   config.
 
 ### 10.3 E2E (Playwright)
 
-- Specs live in `e2e/`; shared helpers in `e2e/helpers.ts`.
+- Specs live in `e2e/`; shared helpers in `e2e/helpers.ts`, which re-exports
+  the implementation from `e2e/support/` (`auth`, `nav`, `farm`, `peers`,
+  `players`) so the modules stay under the file-size cap.
 - Accounts are wiped once per run by `e2e/global-setup.ts` (`POST /api/reset`).
   Tests do **not** reset the server themselves: they register a unique account
   (`uniqueName`) instead, which is what lets the suite run in parallel.
-- Use `registerFast` (auth API + `goto('/world')`) unless the test is about the
-  login form itself; only `auth.spec.ts` drives the UI registration flow
+- Use `registerFast` (auth API + `goto`) unless the test is about the login
+  form itself; only `auth.spec.ts` drives the UI registration flow
   (`registerAccount` / `register`).
+- **Deep-link into the scene under test.** `registerFast(page, name, { area:
+  "casino" })` boots `/world?area=casino` instead of walking there. The real
+  navigation loop is covered once, in `journey.spec.ts`; feature specs should
+  not pay for a farm → marketplace → casino walk. Valid areas are
+  `farm-map`, `marketplace`, `casino`, `livestock-market`, `bank`
+  (`requestedStartArea()` in `src/world/testMode.ts`).
+- The hooks are gated to dev/test: `PageController` injects
+  `<meta name="grange-test-routes" content="true">` only when
+  `enable_test_routes` is on (the same flag as `/api/reset`), and
+  `testMode.ts` reads it. Production never injects it, so `?area=` is ignored
+  and walking speed is normal.
+- `webServer.env` in `playwright.config.ts` runs the suite on a fast clock,
+  all of it e2e-only:
+  - `GRANGE_GROW_MS=100` → `Farm.grow_ms/0`: a crop ripens in 100ms, not 10s.
+  - `GRANGE_TICK_MS=100` → the `FarmTicker` sweep interval, so a watered crop is
+    ready on the next sweep instead of the next second.
+  - `GRANGE_FAST_HASH=1` → the cheap Argon2 parameters `test.exs` uses. The
+    suite registers ~50 accounts, and production hashing is a measurable slice
+    of that.
+  - The test-mode `WALK_SPEED_MULTIPLIER` (in `testMode.ts`) is **3x**, so a
+    `holdKeys` leg covers three times the ground.
+  - Wall-clock animations use `e2eMs(real, fast)` from `testMode.ts`: train
+    travel 2s → 500ms, roulette spin 4.2s → 1s, slots spin 1.8s → 500ms,
+    auto-spin delay 900ms → 200ms. Do not assert transient "spinning" copy:
+    the shortened animation can settle before Playwright reads it, and the
+    settled result is the assertion that matters.
 - `waitForWorld` waits for the canvas and `[data-world-ready="true"]`. Do not
-  add `waitForLoadState("networkidle")` — it is slower and redundant.
+  add `waitForLoadState("networkidle")` — it is slower and redundant. The flag
+  needs `engineReady`, the joined farm snapshot, and (on your own farm) the
+  hydrated inventory; the engine reports ready as soon as its first scene is
+  active, so a world that boots into a hub is ready too.
 - Tile interactions use `clickFarmTile` / `hoverFarmTile`, which map tile
   coordinates to page pixels using `MAP_COLUMNS`/`MAP_ROWS`.
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid. Use
   `holdKeys` only for short geometry legs between prompts, never as a
   stand-in for "walk until the prompt appears".
-- Both helpers re-send their keydown while they hold, and tests that close an
-  overlay wait for the prompt to return before walking. A keydown delivered
-  while a scene is still paused after a DOM overlay closes is dropped, which
-  otherwise leaves the player standing still until the timeout.
+- `walkUntilPrompt` polls every 40ms and releases the movement keys *inside*
+  the page as soon as the prompt matches. Do not "improve" that back into a
+  release over the wire: the canvas runs at a few frames per second on a loaded
+  runner, so a late release walks the player out of neighbouring interaction
+  radii (the casino's poker and slot radii overlap). Both helpers also re-send
+  their keydown while they hold, because a keydown delivered while a scene is
+  still paused after a DOM overlay closes is dropped.
 - Boarding is two steps: the prompt reads `board the train`, then `rideTrain(page,
   destinationId)` presses `E` and clicks `travel-option-<id>` (`marketplace`,
   `home`, `farm-<owner>`).
 - Trains, overlays, and hub easing still cost real time on a busy runner, so
   scene-change assertions after a ride use `TRAVEL_TIMEOUT` (30s) instead of
   Playwright's 5s default.
-- Hub tests use two browser contexts (`browser.newContext()`) and
-  `waitForHubPeer`/`waitForHubPeerGone`, which read the `data-hub-peers`
-  attribute exposed by `FarmMap`.
-- Farm multiplayer tests use the same two-context pattern plus
-  `waitForFarmPeer`/`waitForFarmPeerGone` (`data-farm-peers`) and the
-  `house-menu` / `house-visibility-toggle` / `house-edit-toggle` testids.
-- One spec file per feature, not per overlay: `casino.spec.ts` visits the
-  casino once and exercises all four tables instead of re-walking the world in
-  four files.
+- Multiplayer tests use the `twoPlayers` fixture (`multiplayerTest as test`) —
+  it creates two isolated contexts and always closes them, including on
+  failure. `waitForHubPeer`/`waitForHubPeerGone` read `data-hub-peers`;
+  `waitForFarmPeer`/`waitForFarmPeerGone` read `data-farm-peers`; the house
+  menu uses `house-menu` / `house-visibility-toggle` / `house-edit-toggle`.
+- One spec file per feature, not per overlay: `casino.spec.ts` is four
+  deep-linked tests (one per table), not four files that each re-walk the
+  world.
 - e2e runs against the **built** SPA served by Phoenix on port 3201, not Vite.
 - `pnpm test:e2e` runs `vite build` first. If you changed frontend code, do not
   run Playwright without rebuilding.
-- The suite runs `fullyParallel` with **2 workers everywhere** (`workers: 2`).
-  A faster local machine started at its own core count just saturates the CPU
-  and makes every walk slower than it is with two. The per-test timeout is 90s
-  (the longest paths, like the casino, set their own larger budget).
+- The suite runs `fullyParallel` with **2 workers by default**
+  (`workers: Number(process.env.E2E_WORKERS ?? 2)`); CI sets `E2E_WORKERS=3`
+  because the runner has 4 vCPUs. A faster local machine started at its own core
+  count just saturates the CPU and makes every walk slower than it is with two;
+  raise `E2E_WORKERS` to experiment. The per-test timeout is 90s (the longest
+  paths, like the casino, set their own larger budget).
 
 ### 10.4 CI
 
@@ -990,7 +1080,8 @@ reason (the repo already has one for a deliberate hook dependency).
 3. `pnpm lint:backend`
 4. Install Chromium.
 5. `pnpm check` (lint, Vitest, ExUnit, build).
-6. `pnpm test:e2e`.
+6. `pnpm test:e2e:run` (Playwright only). `pnpm check` already ran `pnpm build`,
+   so the e2e step must not rebuild; CI also sets `E2E_WORKERS=3`.
 
 The required status check name is **`test`**; renaming the job silently
 removes the required check from the ruleset. There is also a `secrets` job that
@@ -1021,8 +1112,8 @@ runs Gitleaks.
 6. Update `notes/farming-mechanics.md` and the crop table in this file.
 7. Add/extend tests in `backend/test/grange/crops_test.exs` and relevant
    `src/world/*.test.ts`. Consider an e2e case for the full grow loop.
-8. Check whether `src/world/farmState.ts` or `farmActions.ts` needs a
-   crop-specific branch (most behavior is registry-driven).
+8. Check whether `src/world/farmActions.ts` needs a crop-specific branch (most
+   behavior is registry-driven).
 
 ### 11.2 Add an inventory item
 
@@ -1085,8 +1176,9 @@ runs Gitleaks.
 1. Extend `WalkingScene` for a standard walkable area, or `ex.Scene` if it needs
    custom behavior.
 2. Add a `*Data.ts` module for terrain, props, spawn points, and entrances.
-3. Add a `*Resources.ts` module and register images in the world's resource
-   list (or `resources.ts`).
+3. Add a `*Resources.ts` module with its image sources, then add the scene to
+   `WorldSceneName` and to `sceneAssets` in `worldAssets.ts`. A scene that is
+   not in `sceneAssets` cannot boot or be travelled to safely.
 4. Define walk obstacles in `sceneObstacles.ts` using `propObstacles`.
 5. Register the scene with `engine.addScene(...)` in `src/world/FarmMap.tsx`.
 6. Add a `SceneInteraction` with `destination` and `destinationSpawn`; extend
@@ -1140,10 +1232,10 @@ runs Gitleaks.
 10. **The combo tracker is client-only.** The server receives only
     `comboMutationMultiplier` (1 or 1.5) and maps it to combo count 15 for the
     drop formula.
-11. **Passive watering / moisture retention is only fully modeled client-side.**
-    `Crops` exposes `passive_water` and the client simulation applies it, but
-    `FarmStore` does not yet water neighbors on a tick. Do not assume the
-    server will do it.
+11. **Passive watering / moisture retention is not modeled at all.** `Crops`
+    exposes `passive_water` and the client registry exposes the decay
+    multiplier, but `FarmStore` does not water neighbors on a tick and the
+    client does not simulate growth. Do not assume either side applies it.
 12. **`FarmStore` is not a GenServer.** It is a plain module using Ecto. Only
     `FarmTicker` is a GenServer.
 13. **SQLite is single-writer.** Dev/test use `pool_size: 1`; prod defaults to
@@ -1168,15 +1260,15 @@ runs Gitleaks.
 22. **Moving props are indexed by source order.** `FarmProps.@assets` must
     match `props` in `mapData.ts`. Reordering props without updating both
     corrupts dig/place behavior.
-23. **Assets are loaded through `ImageSource`.** Add new images to the relevant
-    resource array or they render blank. Paths are relative to `/assets/`.
+23. **Assets are loaded through `ImageSource`, one scene at a time.** Add new
+    images to the relevant resource array *and* to that scene's group in
+    `worldAssets.ts`, or they render blank. Paths are relative to `/assets/`.
 24. **Keep e2e testids stable.** Renaming `farm-tile`, `travel-prompt`,
     `slot-hotbar-N`, `farm-balance`, etc. breaks tests.
 25. **`shared/auth.ts` has unused-looking fields.** `User.createdAt` is never
     sent by the backend (the server sends `inserted_at`), and `passwordHash` is
     server-only. Use `AuthUser` fields that actually exist.
-26. **`FARM_HARVEST_YIELD` / `Farm.harvest_yield/0` are unused.** Harvests add
-    1 produce item.
+26. **`Farm.harvest_yield/0` is unused.** Harvests add 1 produce item.
 27. **Do not edit `backend/priv/static`** — it is generated by `vite build` and
     gitignored.
 28. **`repo-sanity` only sees committed files.** A new junk file can pass a
@@ -1251,10 +1343,11 @@ them silently as part of an unrelated change; mention them in the PR.
 - Settings, whitelist management, and some market tabs (`tools`, `train`) are
   stubs.
 - Rare mutation seeds are persisted server-side, but Sun-Burst Tomato's extra
-  10% seed only rolls in the client-local simulation.
-- Server-side passive watering for Frost-Crisp Lettuce is not implemented.
-- Server growth calculation does not include lettuce moisture retention, while
-  the client `LocalFarmStore` does.
+  10% seed is declared and never rolled.
+- Server-side passive watering for Frost-Crisp Lettuce is not implemented, and
+  nothing else models it either (the old client-local simulation is gone).
+- Server growth calculation does not include lettuce moisture retention; the
+  registry constant exists but no code path applies it.
 - `FarmStore` uses direct Ecto reads/writes; `notes/sqlite-plan.md`’s
   write-behind cache design is outdated.
 - `farms.tomatoes` remains for compatibility and is read by the dashboard and

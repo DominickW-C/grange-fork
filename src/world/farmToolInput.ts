@@ -5,9 +5,12 @@ import { useGameStore } from "../store";
 import type { BlockRegistry } from "./blocking";
 import type { FencePlacementPreview } from "./FencePlacementPreview";
 import { actOnFence, selectedFarmItem } from "./fenceActions";
+import type { FarmBarn } from "./FarmBarn";
 import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
 import type { FarmPlacementPreview } from "./FarmPlacementPreview";
 import type { FarmPropLayer } from "./farmPropLayer";
+import { actOnSprinkler, sprinklerNear } from "./sprinklerActions";
+import type { SprinklerPlacementPreview } from "./SprinklerPlacementPreview";
 import {
 	isMovablePropAsset,
 	ownsFarmTile,
@@ -20,9 +23,12 @@ export interface FarmToolHost {
 	player: ex.Actor;
 	blocks: BlockRegistry;
 	farmProps: FarmPropLayer;
+	barn: FarmBarn;
 	placement: FarmPlacementPreview;
 	fencePlacement: FencePlacementPreview;
+	sprinklerPlacement: SprinklerPlacementPreview;
 	canEdit(): boolean;
+	canRearrangeProps(): boolean;
 	isDeactivated(): boolean;
 	report(text: string): void;
 	reportReadOnly(): void;
@@ -47,9 +53,10 @@ export class FarmToolInput {
 		pointers.primary.on("down", (evt) => {
 			if (this.disabled()) return;
 			const item = selectedFarmItem();
+			if (this.host.barn.handleClick(evt.worldPos, item, this.host.farmProps)) return;
 			const farm = useGameStore.getState().activeFarm;
 			if (item && isMovablePropAsset(item) && farm) {
-				if (!this.host.canEdit()) return this.host.reportReadOnly();
+				if (!this.mayMoveProps()) return this.host.reportReadOnly();
 				if ((farm.prop_inventory[item] ?? 0) > 0)
 					this.host.placement.start(item, evt.worldPos, this.host.player.pos, farm);
 				else this.host.report(`No ${item} in inventory.`);
@@ -60,6 +67,10 @@ export class FarmToolInput {
 				return this.host.fencePlacement.start(
 					evt.worldPos, farm, this.host.blocks, this.host.player.pos,
 				);
+			}
+			if (item === "sprinkler" && farm) {
+				if (!this.host.canEdit()) return this.host.reportReadOnly();
+				return this.host.sprinklerPlacement.start(evt.worldPos, farm);
 			}
 			this.painting = farmToolForItem(item) !== null;
 			this.strokeTiles.clear();
@@ -73,11 +84,13 @@ export class FarmToolInput {
 				this.host.placement.update(evt.worldPos, this.host.player.pos, farm);
 			if (this.host.fencePlacement.active && farm)
 				this.host.fencePlacement.update(evt.worldPos, farm, this.host.blocks, this.host.player.pos);
+			if (this.host.sprinklerPlacement.active && farm)
+				this.host.sprinklerPlacement.update(evt.worldPos, farm);
 			if (this.painting) this.applyToolAt(evt.worldPos);
 		});
 		pointers.primary.on("up", (evt) => {
 			const farm = useGameStore.getState().activeFarm;
-			if (this.host.placement.active && farm && !this.disabled() && this.host.canEdit() &&
+			if (this.host.placement.active && farm && !this.disabled() && this.mayMoveProps() &&
 				selectedFarmItem() === this.host.placement.selectedAsset) {
 				const result = this.host.placement.finish(evt.worldPos, this.host.player.pos, farm);
 				if (result) placeFarmProp(result.asset, result.placement, farm,
@@ -88,6 +101,11 @@ export class FarmToolInput {
 				this.host.fencePlacement.release(evt.worldPos, farm, this.host.blocks, this.host.player.pos,
 					this.host.owner, (message) => this.host.report(message));
 			} else this.host.fencePlacement.clear();
+			if (this.host.sprinklerPlacement.active && farm && !this.disabled() && this.host.canEdit() &&
+				selectedFarmItem() === "sprinkler") {
+				this.host.sprinklerPlacement.release(evt.worldPos, farm, this.host.owner,
+					(message) => this.host.report(message));
+			} else this.host.sprinklerPlacement.clear();
 			this.clear();
 		});
 	}
@@ -106,26 +124,47 @@ export class FarmToolInput {
 		this.applyToolAt(worldPos);
 	}
 
+	private mayMoveProps(): boolean {
+		return this.host.canEdit() || this.host.canRearrangeProps();
+	}
+
 	private applyToolAt(worldPos: ex.Vector): void {
 		const column = Math.floor(worldPos.x / TILE_SIZE);
 		const row = Math.floor(worldPos.y / TILE_SIZE);
 		this.host.updateHover(worldPos);
-		if (!this.host.canEdit()) {
-			this.host.reportReadOnly();
+
+		const edit = this.host.canEdit();
+		if (!ownsFarmTile(column, row, useGameStore.getState().activeFarm?.land_level ?? 0)) {
+			if (!edit) this.host.reportReadOnly();
 			return;
 		}
-		if (!ownsFarmTile(column, row, useGameStore.getState().activeFarm?.land_level ?? 0))
-			return;
 
 		const strokeKey = `${column},${row}`;
 		if (this.strokeTiles.has(strokeKey)) return;
 		this.strokeTiles.add(strokeKey);
 
 		const item = selectedFarmItem();
-		if (handleFarmPropClick(item, worldPos, this.host.farmProps,
-			useGameStore.getState().activeFarm, this.host.owner,
-			(message) => this.host.report(message)))
+		// Admins may rearrange props even on a farm they cannot otherwise edit.
+		if (this.mayMoveProps() &&
+			handleFarmPropClick(item, worldPos, this.host.farmProps,
+				useGameStore.getState().activeFarm, this.host.owner,
+				(message) => this.host.report(message)))
 			return;
+
+		if (!edit) {
+			this.host.reportReadOnly();
+			return;
+		}
+
+		if (item === "shovel") {
+			const active = useGameStore.getState().activeFarm;
+			const sprinkler = active ? sprinklerNear(active, worldPos.x, worldPos.y) : null;
+			if (sprinkler) {
+				actOnSprinkler(this.host.owner, sprinkler.x, sprinkler.y, "shovel",
+					(message) => this.host.report(message));
+				return;
+			}
+		}
 
 		if (item === "gate" || item === "shovel") {
 			actOnFence(this.host.owner, column, row, item, this.host.blocks, this.host.player.pos,

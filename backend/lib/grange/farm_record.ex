@@ -14,6 +14,8 @@ defmodule Grange.FarmRecord do
     field(:tomatoes, :integer, default: 0)
     field(:fence_count, :integer, default: 20)
     field(:gate_count, :integer, default: 2)
+    field(:storage, :map, default: %{})
+    field(:sprinkler_count, :integer, default: 0)
     field(:animals, :map, default: %{})
     field(:land_level, :integer, default: 0)
     field(:is_public, :boolean, default: false)
@@ -28,6 +30,8 @@ defmodule Grange.FarmRecord do
           tomatoes: non_neg_integer(),
           fence_count: non_neg_integer(),
           gate_count: non_neg_integer(),
+          storage: map(),
+          sprinkler_count: non_neg_integer(),
           animals: %{optional(String.t()) => non_neg_integer()},
           land_level: non_neg_integer(),
           is_public: boolean(),
