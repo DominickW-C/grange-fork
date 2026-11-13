@@ -4,7 +4,9 @@ import {
 	clickWorld,
 	farmTilePosition,
 	hoverFarmTile,
+	movePlayerNear,
 	registerFast,
+	tapFarmTile,
 	uniqueName,
 	walkUntilPrompt,
 	worldPoint,
@@ -63,6 +65,9 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 
 	// Drag-paint tills two tiles at once
 	await page.keyboard.press("1");
+	// Stand midway between the two tiles so both are inside reach when the drag
+	// passes over them.
+	await movePlayerNear(page, 8 * 64, 6.5 * 64, 16);
 	const from = await farmTilePosition(page, 7, 6);
 	const to = await farmTilePosition(page, 8, 6);
 	await page.mouse.move(from.x, from.y);
@@ -183,6 +188,7 @@ test("the shovel digs, previews, and drops movable props", async ({ page }) => {
 	// (blocked), refuses to land there, and still returns to its own original
 	// spot. Do this before digging the well: the well is the obstacle.
 	await page.keyboard.press("7");
+	await movePlayerNear(page, 210, 200);
 	await clickWorld(page, 210, 200);
 	const houseSlot = page.locator('[data-item="farmhouse"]');
 	await expect(houseSlot).toHaveCount(1);
@@ -208,15 +214,17 @@ test("the shovel digs, previews, and drops movable props", async ({ page }) => {
 
 	// Dig the well, then drop it on open soil.
 	await page.keyboard.press("7");
+	await movePlayerNear(page, 200, 350);
 	await clickWorld(page, 200, 350);
 	const wellSlot = page.locator('[data-item="well"]');
 	await expect(wellSlot).toHaveCount(1);
 	await wellSlot.click();
-	await clickFarmTile(page, 8, 7);
+	await tapFarmTile(page, 8, 7);
 	await expect(wellSlot).toHaveCount(0);
 
 	// A dug sign can be dropped straight onto the road path.
 	await page.keyboard.press("7");
+	await movePlayerNear(page, 395, 360);
 	await clickWorld(page, 395, 360);
 	const signSlot = page.locator('[data-item="sign"]');
 	await expect(signSlot).toHaveCount(1);
@@ -235,12 +243,13 @@ test("the hoe refuses buildings and the shovel clears flowers", async ({
 	await registerFast(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 
-	// A tile behind a building cannot be worked.
-	await clickFarmTile(page, 3, 2);
+// A tile inside the barn's footprint. It is reachable from the clear ground
+	// beside the building, but the hoe must refuse it as blocked.
+	await clickFarmTile(page, 12, 4);
 	await expect(page.getByTestId("notification-feed")).toContainText(
 		"Something is in the way.",
 	);
-	await expect(page.getByTestId("farm-tile")).toContainText("(3, 2): grass");
+	await expect(page.getByTestId("farm-tile")).toContainText("(12, 4):");
 
 	// Digging the flowers clears the tile for the hoe.
 	await page.keyboard.press("7");

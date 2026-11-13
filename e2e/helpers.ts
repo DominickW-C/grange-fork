@@ -9,11 +9,13 @@ export {
 	BASE,
 	enterFarm,
 	login,
+	mailboxFor,
 	type RegisterFastOptions,
 	register,
 	registerAccount,
 	registerFast,
 	TEST_PASSWORD,
+	tokenFrom,
 	uniqueName,
 	waitForWorld,
 	worldUrl,
@@ -23,6 +25,8 @@ export {
 	clickWorld,
 	farmTilePosition,
 	hoverFarmTile,
+	movePlayerNear,
+	tapFarmTile,
 	worldPoint,
 } from "./support/farm";
 export {

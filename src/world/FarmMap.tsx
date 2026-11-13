@@ -71,6 +71,7 @@ export default function FarmMap() {
 		tomatoes: 0,
 		message: "Hoe: click or drag on grass to till.",
 		hovered: null,
+		player: { x: 0, y: 0 },
 	});
 
 	const target = owner ?? username;
@@ -255,6 +256,8 @@ export default function FarmMap() {
 		<main
 			className="farm-map-page"
 			data-world-ready={worldReady ? "true" : "false"}
+			data-player-x={Math.round(hud.player.x)}
+			data-player-y={Math.round(hud.player.y)}
 			data-hub-peers={hubPeers.join(",")}
 			data-farm-peers={farmPeers.join(",")}
 			data-npc-stage={npcStatus?.stage ?? "none"}

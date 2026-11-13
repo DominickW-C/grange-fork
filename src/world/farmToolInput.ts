@@ -9,6 +9,7 @@ import type { FarmBarn } from "./FarmBarn";
 import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
 import type { FarmPlacementPreview } from "./FarmPlacementPreview";
 import type { FarmPropLayer } from "./farmPropLayer";
+import { withinInteractionRange } from "./interaction";
 import { actOnSprinkler, sprinklerNear } from "./sprinklerActions";
 import type { SprinklerPlacementPreview } from "./SprinklerPlacementPreview";
 import {
@@ -132,6 +133,11 @@ export class FarmToolInput {
 		const column = Math.floor(worldPos.x / TILE_SIZE);
 		const row = Math.floor(worldPos.y / TILE_SIZE);
 		this.host.updateHover(worldPos);
+
+		if (!withinInteractionRange(this.host.player.pos, worldPos)) {
+			this.host.report("Too far away to reach that.");
+			return;
+		}
 
 		const edit = this.host.canEdit();
 		if (!ownsFarmTile(column, row, useGameStore.getState().activeFarm?.land_level ?? 0)) {

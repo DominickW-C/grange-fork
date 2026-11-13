@@ -243,6 +243,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0);
 		updateFarmerGraphics(this.player, dir);
 
+		this.hud.trackPlayer(this.player.pos);
+
 		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
 		const npc = shouldShowNpc(this.isOwner)
 			? npcAnchor(this.farmProps.position("farmhouse"))

@@ -5,7 +5,7 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
 	testDir: "e2e",
-	// Accounts are wiped once in `globalSetup`; tests register unique usernames
+// Accounts are wiped once in `globalSetup`; tests register unique usernames
 	// so they no longer have to reset the server themselves.
 	globalSetup: "./e2e/global-setup.ts",
 	fullyParallel: true,
@@ -42,6 +42,10 @@ export default defineConfig({
 			GRANGE_TICK_MS: process.env.GRANGE_TICK_MS ?? "100",
 			// Argon2 is deliberately slow in dev; e2e registers ~50 accounts.
 			GRANGE_FAST_HASH: "1",
+			// The mailbox route the e2e specs read verification/reset links from
+			// only exists under the console mailer; pin it even when `.env` sets
+			// real Mailtrap credentials for local development.
+			GRANGE_MAILER: "console",
 		},
 	},
 });
