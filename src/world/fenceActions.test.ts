@@ -20,6 +20,7 @@ const farm: ActiveFarm = {
 	sprinkler_count: 0,
 	prop_overrides: [],
 	prop_inventory: {},
+	storage: {},
 };
 const player = { x: 800, y: 600 };
 

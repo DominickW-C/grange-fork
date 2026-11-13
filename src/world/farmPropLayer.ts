@@ -2,6 +2,7 @@ import * as ex from "excalibur";
 import type { ActiveFarm } from "../../shared/types";
 import type { BlockRegistry, TileCoord } from "./blocking";
 import { groundFootprintTiles, rectFootprintTiles } from "./blocking";
+import { withinBarnReach } from "./barnActions";
 import { type PlacedFarmProp, placedFarmProps } from "./farmPropData";
 import {
 	ANIMATED_PROPS,
@@ -79,6 +80,23 @@ export class FarmPropLayer {
 						x <= prop.x + prop.width / 2 &&
 						y >= prop.y - height &&
 						y <= prop.y,
+				)
+				.sort((a, b) => b.prop.y - a.prop.y)[0]?.prop ?? null
+		);
+	}
+
+	/** The topmost barn whose sprite, plus the interaction margin, reaches the
+	 * point. Drives the barn's E-key interact prompt. */
+	barnNear(x: number, y: number): PlacedFarmProp | null {
+		return (
+			[...this.rendered]
+				.filter(
+					({ prop, height }) =>
+						prop.asset === "barn" &&
+						withinBarnReach(
+							{ x, y },
+							{ x: prop.x, y: prop.y, width: prop.width, height },
+						),
 				)
 				.sort((a, b) => b.prop.y - a.prop.y)[0]?.prop ?? null
 		);

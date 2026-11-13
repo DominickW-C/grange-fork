@@ -1,6 +1,7 @@
 import { type Channel, Socket } from "phoenix";
 import type {
 	ActiveFarm,
+	BarnAction,
 	FarmAction,
 	FarmGateAction,
 	FarmPropAction,
@@ -330,6 +331,27 @@ export function emitSellProduce(
 		.receive("ok", () => cb?.({ ok: true }))
 		.receive("error", (payload: unknown) =>
 			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not sell" }),
+		)
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
+}
+
+/** Deposits into or withdraws from the visited farm's barn storage. */
+export function emitBarnAction(
+	owner: string,
+	action: BarnAction,
+	cb?: (res: Ack) => void,
+): void {
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
+		return;
+	}
+
+	channel
+		.push("barnAction", { action })
+		.receive("ok", () => cb?.({ ok: true }))
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not update the barn" }),
 		)
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }

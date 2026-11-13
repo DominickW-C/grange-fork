@@ -2,13 +2,15 @@ import { expect, test } from "@playwright/test";
 import {
 	BASE,
 	login,
+	mailboxFor,
 	register,
 	registerAccount,
+	tokenFrom,
 	uniqueName,
 	waitForWorld,
 } from "./helpers";
 
-test("a new account registers and lands on its farm", async ({ page }) => {
+test("a new account verifies and lands on its farm", async ({ page }) => {
 	const name = uniqueName("Sprout");
 	await registerAccount(page, name);
 
@@ -17,16 +19,22 @@ test("a new account registers and lands on its farm", async ({ page }) => {
 	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
 
-test("creating an account shows the celebration box before the farm", async ({
+test("verifying a new account celebrates before entering the farm", async ({
 	page,
 }) => {
 	const name = uniqueName("Sprout");
+	const email = `${name}@example.test`;
 	await page.goto(`${BASE}/login`);
 	await page.getByTestId("toggle-mode").click();
 	await page.getByTestId("username").fill(name);
-	await page.getByTestId("email").fill(`${name}@example.test`);
+	await page.getByTestId("email").fill(email);
 	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
+	await expect(page.getByTestId("auth-notice")).toBeVisible();
+
+	// The emailed link signs the account in and celebrates the new farm.
+	const token = tokenFrom(await mailboxFor(email), "/verify");
+	await page.goto(`${BASE}/verify?token=${encodeURIComponent(token)}`);
 
 	const dialog = page.getByTestId("account-created");
 	await expect(dialog).toBeVisible();
@@ -36,7 +44,6 @@ test("creating an account shows the celebration box before the farm", async ({
 		"src",
 		/account-created\.mp4$/,
 	);
-	await expect(page).toHaveURL(`${BASE}/login`);
 
 	await page.getByTestId("account-created-continue").click();
 	await expect(page).toHaveURL(/\/world$/);
@@ -127,19 +134,12 @@ test("registration rejects a short password and a duplicate username", async ({
 
 	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
-	await page.getByTestId("account-created-continue").click();
-	await page.waitForURL("**/world");
-	await waitForWorld(page);
+	// A valid signup lands on the "check your email" notice, not on the menu.
+	await expect(page.getByTestId("auth-notice")).toBeVisible();
+	await expect(page).toHaveURL(`${BASE}/login`);
 
-	await page.keyboard.press("Escape");
-	await page.getByTestId("logout").click();
-	await page.waitForURL(`${BASE}/`);
-	await page.getByTestId("menu-login").click();
-	await page.waitForURL("**/login");
-	await page.getByTestId("toggle-mode").click();
-	await page.getByTestId("username").fill(name);
+	// Registering the same username again (with a different email) is rejected.
 	await page.getByTestId("email").fill(`other-${name}@example.test`);
-	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
 	await expect(page.getByTestId("auth-error")).toContainText(
 		/username is taken/i,

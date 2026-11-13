@@ -12,6 +12,7 @@
     "dev": "concurrently -k -n backend,web -c blue,magenta \"pnpm dev:backend\" \"pnpm dev:web\"",
     "dev:backend": "node scripts/run-mix.mjs phx.server",
     "dev:web": "vite",
+    "admin:create": "node scripts/run-mix.mjs grange.create_admin",
     "build": "tsc -p tsconfig.json && vite build",
     "art:cards": "node scripts/generate-card-art.mjs",
     "preview": "vite preview",

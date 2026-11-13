@@ -12,6 +12,28 @@ export function uniqueName(base: string): string {
 }
 
 /**
+ * Reads back the last email the dev console mailer captured for an address.
+ * Only available outside production, where real mail is sent instead.
+ */
+export async function mailboxFor(email: string): Promise<string> {
+	const res = await fetch(
+		`${BASE}/api/auth/mailbox?to=${encodeURIComponent(email)}`,
+	);
+	const body = (await res.json()) as { email?: { text: string } | null };
+	if (!body.email) throw new Error(`no mail captured for ${email}`);
+	return body.email.text;
+}
+
+/** Extracts a `token=` value from the mail line that contains `marker`. */
+export function tokenFrom(text: string, marker: string): string {
+	const line = text.split("\n").find((l) => l.includes(marker));
+	if (!line) throw new Error(`no ${marker} link in mail`);
+	const match = line.match(/token=([^\s&]+)/);
+	if (!match) throw new Error("no token in link");
+	return decodeURIComponent(match[1]);
+}
+
+/**
  * The world URL for an optional deep-link boot scene.
  *
  * `?area=` is only honored by the SPA when the Phoenix shell injected the
@@ -44,8 +66,8 @@ export async function enterFarm(page: Page): Promise<void> {
 }
 
 /**
- * Registers a fresh account through the sign-up form. Continue dismisses the
- * celebration box and enters the new farm, so the page ends up on the farm map.
+ * Registers a fresh account, verifies it through the emailed link, dismisses
+ * the celebration box, and leaves the page on the new account's farm.
  * `/api/reset` wipes accounts too, so the username only has to be unique
  * within a test.
  */
@@ -54,13 +76,19 @@ export async function registerAccount(
 	username: string,
 	password = TEST_PASSWORD,
 ): Promise<string> {
+	const email = `${username}@example.test`;
 	await page.goto(`${BASE}/login`);
 	await page.getByTestId("toggle-mode").click();
 	await page.getByTestId("username").fill(username);
-	await page.getByTestId("email").fill(`${username}@example.test`);
+	await page.getByTestId("email").fill(email);
 	await page.getByTestId("password").fill(password);
 	await page.getByRole("button", { name: /Create Account/i }).click();
-	// Continue dismisses the celebration box and loads the new account's farm.
+	await page.getByTestId("auth-notice").waitFor();
+
+	// Signup issues no session: open the emailed link the console mailer kept.
+	// Verifying signs the account in and celebrates before the farm opens.
+	const token = tokenFrom(await mailboxFor(email), "/verify");
+	await page.goto(`${BASE}/verify?token=${encodeURIComponent(token)}`);
 	await page.getByTestId("account-created-continue").click();
 	await page.waitForURL("**/world");
 	await waitForWorld(page);
@@ -99,14 +127,28 @@ export async function registerFast(
 	options: RegisterFastOptions = {},
 ): Promise<string> {
 	const password = options.password ?? TEST_PASSWORD;
+	const email = `${username}@example.test`;
 	const response = await page.request.post(`${BASE}/api/auth/register`, {
-		data: { username, email: `${username}@example.test`, password },
+		data: { username, email, password },
 	});
 	if (!response.ok()) {
 		throw new Error(
 			`registering ${username} failed: ${response.status()} ${await response.text()}`,
 		);
 	}
+
+	// Registration issues no session: consume the emailed verification link so
+	// the request's cookie jar holds a real session before we open the world.
+	const token = tokenFrom(await mailboxFor(email), "/verify");
+	const verified = await page.request.post(`${BASE}/api/auth/verify-email`, {
+		data: { token },
+	});
+	if (!verified.ok()) {
+		throw new Error(
+			`verifying ${username} failed: ${verified.status()} ${await verified.text()}`,
+		);
+	}
+
 	await page.goto(worldUrl(options.area));
 	await waitForWorld(page);
 	return username;
