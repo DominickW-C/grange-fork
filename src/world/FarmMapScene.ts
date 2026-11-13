@@ -30,6 +30,7 @@ import { TOOL_HINTS } from "./farmTools";
 import { FarmTileSync } from "./farmSceneTiles";
 import { nearbyGate, toggleGate } from "./gateInteraction";
 import { farmActionOnSpace } from "./farmSceneInput";
+import { PlayerReach } from "./interaction";
 import { InputManager } from "./InputManager";
 import { buildTerrain, paintFarmTerrain } from "./farmTerrain";
 import {
@@ -66,6 +67,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private toolInput!: FarmToolInput;
 	private message = TOOL_HINTS.hoe;
 	private hovered: FarmHoveredTile | null = null;
+	private readonly reach = new PlayerReach((message) => this.report(message));
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private readonly travel: FarmTravel;
@@ -232,6 +234,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0);
 		updateFarmerGraphics(this.player, dir);
 
+		if (this.reach.moved(this.player.pos)) this.emitHud();
+
 		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
 		const housePrompt = this.housePrompt();
 		this.travel.update(
@@ -329,11 +333,11 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	}
 
 	private emitHud(): void {
-		const farm = useGameStore.getState().activeFarm;
 		this.onFarmUpdate?.({
-			tomatoes: farm?.tomatoes ?? 0,
+			tomatoes: useGameStore.getState().activeFarm?.tomatoes ?? 0,
 			message: this.message,
 			hovered: this.hovered,
+			player: { x: this.player.pos.x, y: this.player.pos.y },
 		});
 	}
 }

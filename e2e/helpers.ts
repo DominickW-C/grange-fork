@@ -25,6 +25,8 @@ export {
 	clickWorld,
 	farmTilePosition,
 	hoverFarmTile,
+	movePlayerNear,
+	tapFarmTile,
 	worldPoint,
 } from "./support/farm";
 export {

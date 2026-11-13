@@ -5,7 +5,7 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
 	testDir: "e2e",
-	// Accounts are wiped once in `globalSetup`; tests register unique usernames
+// Accounts are wiped once in `globalSetup`; tests register unique usernames
 	// so they no longer have to reset the server themselves.
 	globalSetup: "./e2e/global-setup.ts",
 	fullyParallel: true,

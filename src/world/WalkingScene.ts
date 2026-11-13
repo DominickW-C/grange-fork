@@ -12,6 +12,7 @@ import {
 } from "./hubClient";
 import { HubPlayers } from "./hubPlayers";
 import { InputManager } from "./InputManager";
+import { MAX_INTERACTION_DISTANCE } from "./interaction";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { updateWalkingPlayer } from "./playerMovement";
 import type { WalkObstacle } from "./walkCollisions";
@@ -38,6 +39,8 @@ export interface SceneSpawn {
 export interface SceneInteraction {
 	position: ex.Vector;
 	prompt: string;
+	/** How close the player must stand for the prompt to show. Defaults to
+	 * MAX_INTERACTION_DISTANCE; large objects may declare a wider reach. */
 	radius?: number;
 	/** Controls whether the prompt shows; omit to always allow. */
 	canInteract?: () => boolean;
@@ -190,7 +193,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			(candidate) =>
 				(candidate.canInteract?.() ?? true) &&
 				this.player.pos.distance(candidate.position) <=
-					(candidate.radius ?? 115),
+					(candidate.radius ?? MAX_INTERACTION_DISTANCE),
 		);
 		this.setPrompt(interaction?.prompt ?? null);
 		if (interaction && this.inputManager.consumePress("KeyE", "Enter")) {
