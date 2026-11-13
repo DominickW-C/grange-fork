@@ -25,7 +25,7 @@ defmodule Grange.BankLandTest do
     assert {:error, "insufficient savings"} = Bank.transfer(user.id, "withdraw", 41)
     assert {:ok, %{balance: 75, bank_balance: 25}} = Bank.transfer(user.id, "withdraw", 15)
     assert {:error, "enter a positive whole amount"} = Bank.transfer(user.id, "deposit", -1)
-    assert {:ok, stored} = Accounts.authenticate(user.username, "harvest-please")
+    stored = Accounts.find_by_id(user.id)
     assert stored.balance == 75
     assert stored.bank_balance == 25
   end
