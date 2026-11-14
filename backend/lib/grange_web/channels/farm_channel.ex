@@ -58,7 +58,11 @@ defmodule GrangeWeb.FarmChannel do
 
   @impl true
   def handle_in("farmAction", %{"action" => action}, socket) do
-    authorize_edit(socket, fn owner, actor -> act(socket, owner, actor, action) end)
+    if is_map(action) and action["kind"] in ["place_animal", "remove_animal"] do
+      authorize_owner(socket, fn owner -> act(socket, owner, owner, action) end)
+    else
+      authorize_edit(socket, fn owner, actor -> act(socket, owner, actor, action) end)
+    end
   end
 
   @impl true

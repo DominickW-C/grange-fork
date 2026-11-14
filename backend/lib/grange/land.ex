@@ -7,18 +7,33 @@ defmodule Grange.Land do
 
   def prices, do: @prices
 
-  def check(owner, _kind, x, y, _bounds) do
+  def check(owner, kind, x, y, _bounds) do
+    level = Repo.get!(FarmRecord, owner).land_level
+
     cond do
-      not (is_integer(x) and is_integer(y) and x in -2..19 and y in -4..9) ->
+      not in_map?(kind, x, y, level) ->
         {:error, "out of bounds"}
 
-      owned?(x, y, Repo.get!(FarmRecord, owner).land_level) ->
+      fence_action?(kind) or owned?(x, y, level) ->
         :ok
 
       true ->
         {:error, "buy this land from the mayor first"}
     end
   end
+
+  defp fence_action?(kind), do: kind in [:place_fence, :remove_fence, :place_gate, :remove_gate]
+
+  defp in_map?(kind, x, y, level) when is_integer(x) and is_integer(y) do
+    if fence_action?(kind) do
+      b = bounds(level)
+      x >= b.min_x and x <= b.max_x + 1 and y >= b.min_y and y <= 10
+    else
+      x in -2..19 and y in -4..9
+    end
+  end
+
+  defp in_map?(_kind, _x, _y, _level), do: false
 
   def bounds(level) do
     %{

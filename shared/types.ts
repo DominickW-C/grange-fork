@@ -54,6 +54,8 @@ export interface ActiveFarm {
 	barn: Record<string, number>;
 	/** Livestock owned by this farm, keyed by animal species. */
 	animals: Record<string, number>;
+	/** Individual animals placed on the map; `animals` counts only carried ones. */
+	placed_animals?: Array<{ id: number; species: "cow" | "hen" | "sheep" | "pig"; x: number; y: number }>;
 	land_level?: number;
 	/** Whether strangers may join this farm. */
 	is_public: boolean;
@@ -117,12 +119,16 @@ export type FarmAction = {
 		| "remove_fence"
 		| "place_gate"
 		| "remove_gate"
+		| "place_animal"
+		| "remove_animal"
 		| "place_sprinkler"
 		| "remove_sprinkler";
 	x: number;
 	y: number;
 	/** Seed crop to plant (kind === "plant"). */
 	crop?: CropId;
+	/** Species to place from the farm's unplaced-animal inventory. */
+	animal?: "cow" | "hen" | "sheep" | "pig";
 	/** Harvest tool in hand, so the server can enforce scythe-only crops. */
 	tool?: "hand" | "scythe";
 	/** Combo mutation multiplier carried on a harvest for the rare-seed roll. */
