@@ -461,6 +461,11 @@ in the same room through `getFarmPeers()`. `FarmMap` exposes the current hub and
 farm peer names as `data-hub-peers` / `data-farm-peers` for e2e tests; they are
 not rendered UI.
 
+Clicking another player while holding the shovel plays a client-only comic
+"BONK!" burst and knocks that avatar back; it works on farms (through
+`FarmToolInput` → `FarmScenePresence`) and in hubs (through `WalkingScene`). No
+server event is sent.
+
 ### 5.10 Email verification and password reset
 
 New accounts must confirm their email before they can sign in. The same
@@ -1084,6 +1089,16 @@ reason (the repo already has one for a deliberate hook dependency).
   active, so a world that boots into a hub is ready too.
 - Tile interactions use `clickFarmTile` / `hoverFarmTile`, which map tile
   coordinates to page pixels using `MAP_COLUMNS`/`MAP_ROWS`.
+- `clickFarmTile` walks the player into reach first (farm tools are reach-gated
+  at `MAX_INTERACTION_DISTANCE`). To click a prop, use `movePlayerIntoReach`
+  instead: a prop's center sits inside its obstacle footprint, so the walk can
+  never reach it exactly and would otherwise press into the obstacle until the
+  walk budget runs out. `movePlayerNear` runs its whole loop inside the page,
+  watching the published player position and releasing the keys on the frame
+  it arrives (a wire-delayed release lands late enough to step past the target
+  when a starved runner only manages a couple of frames a second), and it
+  gives up once the player is within `reach` and has stopped closing the
+  distance. Its default budget is 10s, not the old 20s.
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid. Use
   `holdKeys` only for short geometry legs between prompts, never as a
   stand-in for "walk until the prompt appears".
@@ -1116,7 +1131,8 @@ reason (the repo already has one for a deliberate hook dependency).
   because the runner has 4 vCPUs. A faster local machine started at its own core
   count just saturates the CPU and makes every walk slower than it is with two;
   raise `E2E_WORKERS` to experiment. The per-test timeout is 90s (the longest
-  paths, like the casino, set their own larger budget).
+  paths, like the casino, set their own larger budget; the heaviest farm specs
+  use `test.setTimeout(150_000)`).
 
 ### 10.4 CI
 
