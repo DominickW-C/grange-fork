@@ -4,6 +4,7 @@ import {
 	clickWorld,
 	farmTilePosition,
 	hoverFarmTile,
+	movePlayerIntoReach,
 	movePlayerNear,
 	registerFast,
 	tapFarmTile,
@@ -13,6 +14,9 @@ import {
 } from "./helpers";
 
 test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
+	// Five walks, a growth wait, and a drag stroke in one spec: the default 90s
+	// budget leaves too little room on a shared runner.
+	test.setTimeout(150_000);
 	await registerFast(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 	await expect(page.getByTestId("farm-tile")).toBeVisible();
@@ -181,14 +185,15 @@ test("fence placement previews on hold and commits only on a valid release", asy
 	await expect(slot).toHaveAttribute("data-count", "19");
 });
 
-test("the shovel digs, previews, and drops movable props", async ({ page }) => {
+test("the shovel previews and restores a farmhouse", async ({ page }) => {
 	await registerFast(page, uniqueName("Mover"));
 
 	// A carried house previews while dragging over the still-standing well
 	// (blocked), refuses to land there, and still returns to its own original
 	// spot. Do this before digging the well: the well is the obstacle.
 	await page.keyboard.press("7");
-	await movePlayerNear(page, 210, 200);
+	// Stand within reach of the house; its own footprint is not walkable.
+	await movePlayerIntoReach(page, 210, 200);
 	await clickWorld(page, 210, 200);
 	const houseSlot = page.locator('[data-item="farmhouse"]');
 	await expect(houseSlot).toHaveCount(1);
@@ -211,20 +216,28 @@ test("the shovel digs, previews, and drops movable props", async ({ page }) => {
 	await expect(houseSlot).toHaveCount(1);
 	await page.mouse.up();
 	await expect(houseSlot).toHaveCount(0);
+});
+
+test("the shovel moves a well", async ({ page }) => {
+	await registerFast(page, uniqueName("Mover"));
 
 	// Dig the well, then drop it on open soil.
 	await page.keyboard.press("7");
-	await movePlayerNear(page, 200, 350);
+	await movePlayerIntoReach(page, 200, 350);
 	await clickWorld(page, 200, 350);
 	const wellSlot = page.locator('[data-item="well"]');
 	await expect(wellSlot).toHaveCount(1);
 	await wellSlot.click();
 	await tapFarmTile(page, 8, 7);
 	await expect(wellSlot).toHaveCount(0);
+});
+
+test("the shovel moves a sign onto a path", async ({ page }) => {
+	await registerFast(page, uniqueName("Mover"));
 
 	// A dug sign can be dropped straight onto the road path.
 	await page.keyboard.press("7");
-	await movePlayerNear(page, 395, 360);
+	await movePlayerIntoReach(page, 395, 360);
 	await clickWorld(page, 395, 360);
 	const signSlot = page.locator('[data-item="sign"]');
 	await expect(signSlot).toHaveCount(1);
@@ -243,7 +256,7 @@ test("the hoe refuses buildings and the shovel clears flowers", async ({
 	await registerFast(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 
-// A tile inside the barn's footprint. It is reachable from the clear ground
+	// A tile inside the barn's footprint. It is reachable from the clear ground
 	// beside the building, but the hoe must refuse it as blocked.
 	await clickFarmTile(page, 12, 4);
 	await expect(page.getByTestId("notification-feed")).toContainText(
@@ -265,6 +278,9 @@ test("the hoe refuses buildings and the shovel clears flowers", async ({
 test("a visitor sees another farm read-only but can toggle its gates", async ({
 	page,
 }) => {
+	// Two accounts, a logout, and a fresh world boot in one spec: the default
+	// 90s budget leaves too little room on a shared runner.
+	test.setTimeout(150_000);
 	const owner = uniqueName("Owner");
 	await registerFast(page, owner);
 	await page.keyboard.press("5");
