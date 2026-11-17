@@ -4,7 +4,7 @@ defmodule GrangeWeb.FarmChannelTest do
 
   import Grange.FarmFixtures
 
-  alias Grange.{Accounts, Farm, FarmStore, Inventory, Repo}
+  alias Grange.{Accounts, Barn, Farm, FarmStore, Inventory, NpcQuest, Repo}
   alias GrangeWeb.ChannelCase, as: Helper
   alias GrangeWeb.Presence
 
@@ -192,6 +192,42 @@ defmodule GrangeWeb.FarmChannelTest do
     ref = push(socket, "sellProduce", %{"item" => "tomato", "count" => 1})
     assert_reply(ref, :error, reply)
     assert reply.error == "not your farm"
+  end
+
+  test "the owner's join reply carries the farmhand quest, visitors get none" do
+    full_farm("Alice")
+    assert {:ok, reply, _socket} = join_farm("Alice", "Alice")
+    assert reply.npc.stage == "intro"
+
+    public_farm("Bob")
+    assert {:ok, visitor_reply, _socket} = join_farm("Carol", "Bob")
+    assert visitor_reply.npc == nil
+  end
+
+  test "the owner can see the intro and hand in ten tomatoes" do
+    full_farm("Alice")
+    {:ok, _reply, socket} = join_farm("Alice", "Alice")
+
+    assert_reply(push(socket, "npcIntroSeen", %{}), :ok, %{npc: %{stage: "tomatoes"}})
+
+    Barn.add("Alice", "tomato", 10)
+    NpcQuest.force("Alice", %{"stage" => "tomatoes"})
+
+    ref = push(socket, "npcSell", %{"item" => "tomato"})
+    assert_reply(ref, :ok, %{npc: %{stage: "supplies", tomatoes: 10}, balance: 150})
+    assert_broadcast("farmUpdate", %{farm: %{barn: %{"tomato" => 0}}})
+  end
+
+  test "a visitor cannot trade with the farmhand" do
+    editable_farm("Alice")
+    {:ok, _reply, socket} = join_farm("Bob", "Alice")
+    NpcQuest.force("Alice", %{"stage" => "tomatoes"})
+    Barn.add("Alice", "tomato", 10)
+
+    ref = push(socket, "npcSell", %{"item" => "tomato"})
+    assert_reply(ref, :error, reply)
+    assert reply.error == "not your farm"
+    assert Barn.map("Alice")["tomato"] == 10
   end
 
   test "the owner can store and retrieve items from the barn" do

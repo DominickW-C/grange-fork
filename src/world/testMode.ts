@@ -46,12 +46,26 @@ export function requestedStartArea(): WorldSceneName | null {
 }
 
 /**
+ * Whether this page asked to walk at production speed with `?walk=normal`.
+ *
+ * A spec opts out when it has to *read* a prompt that is only on screen for a
+ * frame or two at the 3x speed, where the prompt DOM can lag a frame behind and
+ * skip the text entirely.
+ */
+function requestedNormalWalk(): boolean {
+	if (!enabled || typeof window === "undefined") return false;
+	return new URLSearchParams(window.location.search).get("walk") === "normal";
+}
+
+/**
  * Multiplier applied to walking speed in all world scenes. E2E runs walk three
  * times as fast so navigation-heavy specs stay quick; normal play is unchanged.
  * The e2e helper polls 40ms apart, so a 3x walk still stops well inside the
- * default 115px interaction radius.
+ * default 115px interaction radius. Anything narrower (the farmhand's 90px
+ * radius, for one) is crossed in about a frame, so those specs ask for
+ * `?walk=normal` and check the prompt at production speed.
  */
-export const WALK_SPEED_MULTIPLIER = enabled ? 3 : 1;
+export const WALK_SPEED_MULTIPLIER = enabled && !requestedNormalWalk() ? 3 : 1;
 
 /**
  * Picks the e2e timing for an animation or wait: `fast` in an e2e run, `real`

@@ -52,6 +52,8 @@ Grange is a peaceful farming game with a hub world:
   public and let visitors farm, build, and move props.
 - Fences and gates are placed from the hotbar; props (buildings, trees, decor)
   can be dug up and moved.
+- A placeholder farmhand beside the farmhouse runs a short starter quest:
+  welcome, hand in ten tomatoes, then ten lettuce and ten wheat.
 
 The game is under active course-project development. Some UI is stubbed
 (Settings, whitelist management, some market tabs) and some behavior is
@@ -247,6 +249,7 @@ auth is the `_grange_key` cookie; the socket uses the token instead.
 | POST | `/api/hardware/buy` | cookie | `{item, quantity}` → `{balance, sprinkler_count}` |
 | GET | `/api/state` | none | `{playerCount, farmCount}` |
 | POST | `/api/reset` | none | Dev/test only; wipes accounts and farms |
+| POST | `/api/dev/npc` | cookie | Dev/test only; forces farmhand stage/counters and fills the barn |
 
 Unmatched `/api/*` routes return JSON 404 before the SPA fallback. Every other
 path serves the built `index.html`.
@@ -271,10 +274,12 @@ Join reply:
 
 #### `farm:<owner>`
 
-Join reply: `{ "farm": <ActiveFarm> }` followed by Phoenix
-`presence_state` / `presence_diff`. Only signed-in sockets may join. The
-joining account's own farm is created on demand (`FarmStore.ensure/1`) so its
-seed ledger exists even when it is only visiting.
+Join reply: `{ "farm": <ActiveFarm>, "npc": <NpcQuestStatus | null> }` followed
+by Phoenix `presence_state` / `presence_diff`. Only signed-in sockets may join.
+The joining account's own farm is created on demand (`FarmStore.ensure/1`) so
+its seed ledger exists even when it is only visiting. `npc` is the owner's
+farmhand quest state; visitors get `null`, which keeps the placeholder farmhand
+off their screen entirely.
 
 - The owner always joins their own farm.
 - A stranger may join only while the farm is public (`farms.is_public`).
@@ -283,7 +288,9 @@ seed ledger exists even when it is only visiting.
 
 Server pushes `farmUpdate` → `{ "farm": <ActiveFarm> }` after every successful
 change. There is **no partial/delta update**: the client replaces the whole
-active farm.
+active farm. The dev-only route `POST /api/dev/npc` also pushes
+`npcUpdate` → `{ "npc": <NpcQuestStatus> }` so a seeded quest reaches an open
+tab without a rejoin.
 
 Client events:
 
@@ -294,6 +301,8 @@ Client events:
 | `farmPropAction` | `{action: {kind: "dig", index} \| {kind: "place", asset, x, y}}` | owner, or visitor while `visitor_edit`, or any admin | `:ok` | `{error: reason}` |
 | `barnAction` | `{action: {kind: "deposit" \| "withdraw", item, count}}` | farm owner only | `:ok` | `{error: reason}` |
 | `sellProduce` | `{item: cropId, count: integer}` | farm owner only | `:ok` | `{error: reason}` |
+| `npcIntroSeen` | `{}` | farm owner only | `{npc}` | `{error: reason}` |
+| `npcSell` | `{item: cropId}` | farm owner only | `{npc, balance}` | `{error: reason}` |
 | `updateSettings` | `{is_public?, visitor_edit?}` | farm owner only | `{farm}` | `{error: reason}` |
 | `move` | `{x, y}` | any joined user | `:ok` | `{error: "move ignored"}` |
 | `pausePresence` | `{}` | any joined user | `:ok` | `{error: reason}` |
@@ -540,7 +549,9 @@ single-use token machinery backs both email verification and password reset.
 │       ├── tileSync / farmSceneTiles / cropLayer
 │       ├── fence* / gateInteraction / blocking
 │       ├── farmProp* / propLayer / placement previews
-│       ├── marketData / useFarmMarket / MarketWindow
+│       ├── farmNpc / farmNpcPosition / npcQuest ← placeholder farmhand
+│       ├── NpcTradeWindow / useNpcTrade / npcStore / npcSocket
+│       ├── marketData / useFarmMarket / MarketWindow / seedShop
 │       ├── blackjack*, poker*, roulette*, slots* ← client-side casino games
 │       ├── resources.ts / *Resources.ts ← Excalibur image sources
 │       ├── worldAssets.ts     ← per-scene image groups + lazy loading
@@ -565,6 +576,7 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── barn.ex / barn_item.ex
 │   │   ├── farm_fences.ex / farm_gates.ex / farm_props.ex
 │   │   ├── farm_gate_actions.ex ← visitor-safe gate toggle
+│   │   ├── npc_quest.ex / npc_quest_record.ex ← farmhand starter quest
 │   │   ├── farm_record.ex / tile.ex / user.ex / session.ex
 │   │   └── farm_fence.ex / farm_gate.ex / farm_prop.ex
 │   ├── lib/grange_web/
@@ -573,7 +585,7 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── user_socket.ex     ← token auth in connect params
 │   │   ├── presence.ex        ← ephemeral hub presence tracker
 │   │   ├── channels/{lobby,farm,hub}_channel.ex
-│   │   └── controllers/{auth,economy,health,page,fallback}_controller.ex
+│   │   └── controllers/{auth,economy,health,page,dev,fallback}_controller.ex
 │   ├── priv/repo/migrations/  ← auto-run on boot
 │   └── test/                  ← ExUnit + support helpers + Credo checks
 ├── e2e/                       ← Playwright specs + shared helpers
@@ -609,10 +621,11 @@ single-use token machinery backs both email verification and password reset.
 | `farm_gates` | `owner` FK, `x`, `y`, `direction`, `open` | Unique `(owner, x, y)`. `direction` is `horizontal` or `vertical`. |
 | `farm_sprinklers` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. `(x, y)` is the top-left tile of the watered 2x2; the object is drawn on that 2x2's shared corner. |
 | `farm_props` | `owner` FK, `source_index`, `asset`, `x`, `y`, `carried` | Unique `(owner, source_index)`. Indices map to the starter prop list. |
+| `npc_quests` | `owner` FK, `stage`, `tomatoes_sold`, `lettuce_sold`, `wheat_sold` | One row per farm. `stage` is `intro`, `tomatoes`, `supplies`, or `complete`; counters cap at 10. |
 
 All foreign keys cascade on farm delete. `Accounts.reset/0` deletes sessions
 then users; `FarmStore.reset/0` deletes tiles, barn items, fences, gates,
-sprinklers, props, then farms.
+sprinklers, props, farmhand quests, then farms.
 
 ### 7.2 Wire types (`shared/types.ts`)
 
@@ -671,6 +684,22 @@ train menu, so `is_public` is mostly a guard for stale snapshots.
 
 `FarmPropAction` is `{kind: "dig", index}` or
 `{kind: "place", asset, x, y}`.
+
+`NpcQuestStatus` is the owner's farmhand progress:
+
+```ts
+export type NpcStage = "intro" | "tomatoes" | "supplies" | "complete";
+
+export interface NpcQuestStatus {
+  stage: NpcStage;
+  tomatoes: number; // handed in so far, 0..10
+  lettuce: number;
+  wheat: number;
+}
+```
+
+It arrives in the `farm:<owner>` join reply (owner only) and in every
+`npcIntroSeen` / `npcSell` ack.
 
 ### 7.3 Coordinates, units, and grids
 
@@ -876,6 +905,34 @@ the client repaints it as grass.
 - The server owns the rule; the client only repaints what `farmUpdate`
   delivers.
 
+### 8.8 Farmhand starter quest
+
+A placeholder farmhand (a plain brown rectangle named "Walt") stands beside the
+owner's farmhouse and runs a two-stage selling tutorial. He is owner-only: his
+quest state rides on the `farm:<owner>` join reply as `npc`, and visitors get
+`null` so he never renders or prompts for them.
+
+- Stage `intro`: the first talk shows a one-time welcome. Dismissing it
+  (`Escape`, the close button, or "What do you need?") records `npcIntroSeen`
+  and advances to `tomatoes`; the window stays open and redraws as the tomato
+  order.
+- Stage `tomatoes`: he asks for ten tomatoes. The sell button enables when the
+  barn holds ten and pays `Crops.get("tomato").sell_value * 10`. The hand-in
+  removes ten from the barn, credits the wallet, and advances to `supplies`;
+  his thanks gets its own client-only screen (dismissed with Esc, ×, or "Got
+  it") before the lettuce/wheat menu appears.
+- Stage `supplies`: he wants ten lettuce and ten wheat, sold one batch at a
+  time, and sells repeatable ten-seed bundles at market price (40 GC lettuce,
+  20 GC wheat). Both hand-ins advance to `complete`.
+- Stage `complete`: he delivers the "meet me at the market" line and the
+  rectangle disappears. There is no marketplace cameo yet.
+
+Rules live in `Grange.NpcQuest` (server, authoritative) and `src/world/npcQuest.ts`
+(pure cards/offers/dialogue). Trades are channel events, not HTTP: the client
+never moves quest counters or barn counts itself. `FarmNpc` follows the live
+farmhouse prop position (`x + 145, y + 40`) and hides when the house is packed
+into the inventory. See `notes/npc-tutorial.md`.
+
 ---
 
 ## 9. Coding conventions
@@ -1032,6 +1089,16 @@ reason (the repo already has one for a deliberate hook dependency).
   active, so a world that boots into a hub is ready too.
 - Tile interactions use `clickFarmTile` / `hoverFarmTile`, which map tile
   coordinates to page pixels using `MAP_COLUMNS`/`MAP_ROWS`.
+- `clickFarmTile` walks the player into reach first (farm tools are reach-gated
+  at `MAX_INTERACTION_DISTANCE`). To click a prop, use `movePlayerIntoReach`
+  instead: a prop's center sits inside its obstacle footprint, so the walk can
+  never reach it exactly and would otherwise press into the obstacle until the
+  walk budget runs out. `movePlayerNear` runs its whole loop inside the page,
+  watching the published player position and releasing the keys on the frame
+  it arrives (a wire-delayed release lands late enough to step past the target
+  when a starved runner only manages a couple of frames a second), and it
+  gives up once the player is within `reach` and has stopped closing the
+  distance. Its default budget is 10s, not the old 20s.
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid. Use
   `holdKeys` only for short geometry legs between prompts, never as a
   stand-in for "walk until the prompt appears".
@@ -1064,7 +1131,8 @@ reason (the repo already has one for a deliberate hook dependency).
   because the runner has 4 vCPUs. A faster local machine started at its own core
   count just saturates the CPU and makes every walk slower than it is with two;
   raise `E2E_WORKERS` to experiment. The per-test timeout is 90s (the longest
-  paths, like the casino, set their own larger budget).
+  paths, like the casino, set their own larger budget; the heaviest farm specs
+  use `test.setTimeout(150_000)`).
 
 ### 10.4 CI
 
@@ -1304,6 +1372,10 @@ runs Gitleaks.
     capped at 100ms and is identical to `delta` at normal frame rates. Take one
     step per `onPreUpdate` and pass it down; do not call `step()` twice in a
     frame.
+39. **The farmhand quest is server-authoritative and owner-only.** `NpcQuest`
+    moves counters and the barn in one transaction and credits the wallet; the
+    client only renders `npc` from the join reply/acks. Never mutate
+    `npcStore` locally beyond that mirror, and never show him to a visitor.
 
 ---
 
@@ -1343,7 +1415,11 @@ them silently as part of an unrelated change; mention them in the PR.
   write-behind cache design is outdated.
 - `farms.tomatoes` remains for compatibility and is read by the dashboard and
   farm HUD.
-- `Farm.harvest_yield/0` is a dead constant.
+- `FARM_HARVEST_YIELD` and `Farm.harvest_yield/0` are dead constants.
+- The farmhand's quest is a starter tutorial with placeholder art (a brown
+  rectangle), no marketplace cameo, and no per-crop partial hand-ins. His
+  seed bundles are bought through `/api/inventory/buy`, so they share the
+  market's stock cap and server pricing.
 - `User.createdAt` in `shared/auth.ts` does not match the server payload.
 - The economy trusts client-supplied deltas; it is a game, not a ledger.
 - Casino games are entirely client-side; only the resulting wallet delta is
@@ -1372,6 +1448,7 @@ them silently as part of an unrelated change; mention them in the PR.
 - `notes/farming-mechanics.md` — crop/mechanic reference and asset mapping.
 - `notes/hub-multiplayer.md` — hub channel, presence, rendering, tuning.
 - `notes/farm-multiplayer.md` — farm settings, visitor rules, farm presence.
+- `notes/npc-tutorial.md` — farmhand quest stages, prices, and test hook.
 - `notes/change-policy.md` — branch/PR/review policy.
 - `notes/WireFrameLayout.md` — HUD/menu/inventory layout intent.
 - `notes/GameDesignNotes.md` — high-level game direction.
