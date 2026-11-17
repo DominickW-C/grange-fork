@@ -38,9 +38,9 @@ test("players share the marketplace, the casino, and their own farms", async ({
 	await registerFast(alice, aliceName);
 	await registerFast(bob, bobName);
 
-	// Farms stay private: no peers are listed there.
-	expect(await hubPeerList(alice)).toBe("");
-	expect(await hubPeerList(bob)).toBe("");
+	// Farms stay private: neither player is a peer of the other.
+	expect(await hubPeerList(alice)).not.toContain(bobName);
+	expect(await hubPeerList(bob)).not.toContain(aliceName);
 
 	await enterMarketplaceHub(alice);
 	await enterMarketplaceHub(bob);
@@ -57,7 +57,9 @@ test("players share the marketplace, the casino, and their own farms", async ({
 	await expectArea(bob, /^Casino map/, 10_000);
 
 	await waitForHubPeerGone(alice, bobName);
-	expect(await hubPeerList(bob)).toBe("");
+	// The suite shares one server, so another spec's player may legitimately be
+	// in the casino: assert that Alice did not carry over, not that it is empty.
+	expect(await hubPeerList(bob)).not.toContain(aliceName);
 
 	// Alice joins him and both are visible in the casino.
 	await alice.bringToFront();
