@@ -43,6 +43,7 @@ import { SprinklerLayer } from "./sprinklerRendering";
 import { SweepFx } from "./sweepFx";
 import { findTrainRest, TrainController } from "./train";
 import type { SceneActivationData, WorldArea } from "./WalkingScene";
+import { publishViewTransform } from "./viewTransform";
 
 export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	onFarmUpdate: ((snapshot: FarmHudSnapshot) => void) | null = null;
@@ -190,7 +191,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.presence?.update(0);
 	}
 
-	override onPreUpdate(_engine: ex.Engine, _delta: number): void {
+	override onPreUpdate(engine: ex.Engine, _delta: number): void {
 		const step = this.frameClock.step();
 		const selected = selectedFarmItem();
 		const blocked = isInventoryBlockingInput();
@@ -242,8 +243,10 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			step,
 			this.combo.moveSpeed,
 			farm?.land_level ?? 0,
+			this.hud.landBorderHint,
 		);
-		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0);
+		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0, engine);
+		publishViewTransform(engine, this.camera);
 		updateFarmerGraphics(this.player, dir);
 
 		this.hud.trackPlayer(this.player.pos);
