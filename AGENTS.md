@@ -1376,6 +1376,13 @@ runs Gitleaks.
     moves counters and the barn in one transaction and credits the wallet; the
     client only renders `npc` from the join reply/acks. Never mutate
     `npcStore` locally beyond that mirror, and never show him to a visitor.
+40. **The release bundles ERTS and its NIFs, so the deploy runner's glibc must
+    not be newer than the hosts'.** Both deploy workflows pin
+    `runs-on: ubuntu-24.04` (glibc 2.38) because the hosts run Debian 13
+    (glibc 2.41). When `ubuntu-latest` moved to 26.04, the OTP build required
+    `GLIBC_2.43`, `beam.smp` refused to start, and every deploy failed its
+    health check while nginx served 502. Do not switch the deploy workflows
+    back to `ubuntu-latest`; pick the newest image the hosts can load.
 
 ---
 
