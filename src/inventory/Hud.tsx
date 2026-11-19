@@ -9,6 +9,8 @@ import { useInventoryStore } from "./inventoryStore";
 interface HudProps {
 	tiles: number;
 	hovered: FarmHoveredTile | null;
+	/** False while a market/casino/bank/fishing window owns the screen. */
+	chatEnabled: boolean;
 }
 
 /**
@@ -16,14 +18,14 @@ interface HudProps {
  * hotbar (center), the chat/notification feed (left), and the Grangecoin
  * wallet plus keyboard prompts (right).
  */
-export function Hud({ tiles, hovered }: HudProps) {
+export function Hud({ tiles, hovered, chatEnabled }: HudProps) {
 	const openInventory = useInventoryStore((s) => s.setInventoryOpen);
 	const setPaused = usePauseStore((s) => s.setPaused);
 
 	return (
 		<div className="hud-root">
 			<div className="hud-bottom-left">
-				<NotificationFeed />
+				<NotificationFeed chatEnabled={chatEnabled} />
 			</div>
 
 			<div className="hud-bottom-center">

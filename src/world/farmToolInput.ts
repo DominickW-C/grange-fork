@@ -1,4 +1,5 @@
 import type * as ex from "excalibur";
+import { isChatComposing } from "../chat/chatStore";
 import { farmToolForItem } from "../inventory/items";
 import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import { useGameStore } from "../store";
@@ -142,7 +143,9 @@ export class FarmToolInput {
 	}
 
 	private disabled(): boolean {
-		return this.host.isDeactivated() || isInventoryBlockingInput();
+		return (
+			this.host.isDeactivated() || isInventoryBlockingInput() || isChatComposing()
+		);
 	}
 
 	applyAt(worldPos: ex.Vector): void {

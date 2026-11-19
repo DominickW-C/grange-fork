@@ -1,5 +1,6 @@
 import * as ex from "excalibur";
 import type { FarmToolId } from "../../shared/farm";
+import { isChatComposing } from "../chat/chatStore";
 import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import { farmToolForItem } from "../inventory/items";
 import { useGameStore } from "../store";
@@ -194,7 +195,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	override onPreUpdate(engine: ex.Engine, _delta: number): void {
 		const step = this.frameClock.step();
 		const selected = selectedFarmItem();
-		const blocked = isInventoryBlockingInput();
+		const blocked = isInventoryBlockingInput() || isChatComposing();
 		for (const [preview, item] of [
 			[this.placement, this.placement.selectedAsset],
 			[this.fencePlacement, "fence"],
@@ -220,19 +221,15 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.animals.update(step);
 		this.presence?.update(step);
 
-		// Freeze and hide the player while the inventory modal captures input,
-		// while a farmhouse/train/barn menu is open, while the fishing overlay
-		// is open, or while the train carries them. Swallow interact presses so
-		// closing an overlay doesn't immediately reopen the barn.
-		if (
-			this.paused ||
-			isInventoryBlockingInput() ||
-			this.fishing.isPaused ||
-			!this.train.isParked()
-		) {
+		// Freeze and hide the player while the inventory modal or the chat
+		// composer captures input, while a farmhouse/train/barn menu is open,
+		// while the fishing overlay is open, or while the train carries them.
+		// Swallow interact presses so closing an overlay doesn't immediately
+		// reopen the barn.
+		if (this.paused || blocked || this.fishing.isPaused || !this.train.isParked()) {
 			this.player.vel = ex.vec(0, 0);
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
-			this.inputManager.consumePress("KeyE", "Enter");
+			this.inputManager.consumePress("KeyE");
 			return;
 		}
 
@@ -271,7 +268,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			housePrompt,
 			this.onOpenHouse,
 		);
-		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
+		if (gate && this.inputManager.consumePress("KeyE")) {
 			toggleGate(this.owner, gate.gate, (message) => this.hud.report(message));
 		}
 		// The barn claims E before fishing drains it, but only while in reach.

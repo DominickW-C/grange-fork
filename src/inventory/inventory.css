@@ -87,6 +87,85 @@
 	color: #e07a1f;
 }
 
+.hud-feed-player {
+	color: #f3e7d0;
+}
+
+.hud-feed-author {
+	color: #d8b26a;
+}
+
+.hud-feed-player .hud-feed-author {
+	color: #a7c957;
+}
+
+/* Chat composer: the feed's parent disables pointer events for the HUD. */
+.hud-chat-open {
+	pointer-events: auto;
+	align-self: flex-start;
+	margin-top: 0.15rem;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: #9a8b72;
+	font: inherit;
+	font-size: 0.62rem;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.hud-chat-open:hover:not(:disabled) {
+	color: #f3e7d0;
+}
+
+.hud-chat-open:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.hud-chat-form {
+	pointer-events: auto;
+	display: flex;
+	gap: 0.25rem;
+	margin-top: 0.15rem;
+}
+
+.hud-chat-input {
+	flex: 1;
+	min-width: 0;
+	padding: 0.2rem 0.35rem;
+	border: 1px solid rgba(58, 44, 30, 0.8);
+	border-radius: 0.25rem;
+	background: rgba(20, 15, 10, 0.9);
+	color: #f3e7d0;
+	font: inherit;
+	font-size: 0.7rem;
+}
+
+.hud-chat-input:focus {
+	outline: 1px solid #a7c957;
+}
+
+.hud-chat-input::placeholder {
+	color: #7d705c;
+}
+
+.hud-chat-send {
+	padding: 0.2rem 0.45rem;
+	border: 1px solid rgba(58, 44, 30, 0.8);
+	border-radius: 0.25rem;
+	background: #5b3a20;
+	color: #f3e7d0;
+	font: inherit;
+	font-size: 0.65rem;
+	cursor: pointer;
+}
+
+.hud-chat-send:hover {
+	background: #6d4829;
+}
+
 .hud-hotbar {
 	/* Slightly larger than before; scales with the viewport so it stays a
 	   comfortable, dominant control without overflowing narrow screens. */

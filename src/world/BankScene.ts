@@ -21,10 +21,10 @@ export class BankScene extends WalkingScene {
 			interactions: [
 				{ position: ex.vec(576, 714), destination: "marketplace",
 					destinationSpawn: { x: MARKETPLACE_BANK_ENTRANCE.x, y: MARKETPLACE_BANK_ENTRANCE.y + 60 },
-					prompt: "Press E or Enter to leave the bank", radius: 60 },
-				{ position: ex.vec(470, 472), prompt: "Press E or Enter to talk to bank teller",
+					prompt: "Press E to leave the bank", radius: 60 },
+				{ position: ex.vec(470, 472), prompt: "Press E to talk to bank teller",
 					radius: 125, action: () => onTalk("teller") },
-				{ position: ex.vec(876, 472), prompt: "Press E or Enter to talk to mayor",
+				{ position: ex.vec(876, 472), prompt: "Press E to talk to mayor",
 					radius: 125, action: () => onTalk("mayor") },
 			],
 			onAreaChange,

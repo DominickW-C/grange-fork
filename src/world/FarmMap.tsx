@@ -1,6 +1,8 @@
 import type * as ex from "excalibur";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { chatAvailable } from "../chat/chatAvailability";
+import { useChatRoom } from "../chat/useChatRoom";
 import { Hud } from "../inventory/Hud";
 import { InventoryPanel } from "../inventory/InventoryPanel";
 import { farmToolForItem } from "../inventory/items";
@@ -41,6 +43,7 @@ import {
 import { useHouseMenu } from "./useHouseMenu";
 import { useLivestockPurchase } from "./useLivestockPurchase";
 import { useNpcTrade } from "./useNpcTrade";
+import { useWelcomeNotice } from "./useWelcomeNotice";
 import { useWorldEngine } from "./useWorldEngine";
 import { useWorldTravel } from "./useWorldTravel";
 import type { WorldArea } from "./WalkingScene";
@@ -77,6 +80,7 @@ export default function FarmMap() {
 	const target = owner ?? username;
 	const isOwner = target === username;
 	const [area, setArea] = useState<WorldArea>("Farm");
+	useChatRoom(area);
 	const {
 		market,
 		marketMessage,
@@ -202,13 +206,7 @@ export default function FarmMap() {
 		if (hud.message) pushNotice(hud.message, "system");
 	}, [hud.message, pushNotice]);
 
-	useEffect(() => {
-		if (!target) return;
-		pushNotice(
-			isOwner ? "Welcome to your farm." : `Visiting ${target}'s farm.`,
-			"system",
-		);
-	}, [target, isOwner, pushNotice]);
+	useWelcomeNotice(target, isOwner);
 
 	// Leaving the world closes any open overlay so re-entry starts fresh.
 	useEffect(() => {
@@ -251,6 +249,11 @@ export default function FarmMap() {
 	// be dropped by emitFarmAction, so the world isn't interactive yet.
 	const worldReady =
 		engineReady && farm !== null && (!isOwner || inventoryHydrated);
+
+	// DOM windows that own the screen also own Enter, so chat stays closed.
+	const chatEnabled = chatAvailable(
+		market, casinoOverlay, bankDesk, livestock.pen, fishingOpen, houseOpen, npcOpen,
+	);
 
 	return (
 		<main
@@ -308,7 +311,11 @@ export default function FarmMap() {
 				</div>
 			)}
 			{!market && (!isOwner || inventoryHydrated) && (
-				<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
+				<Hud
+					tiles={farm?.tiles.length ?? 0}
+					hovered={hud.hovered}
+					chatEnabled={chatEnabled}
+				/>
 			)}
 			<ComboCounter />
 			<InventoryPanel />

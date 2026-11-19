@@ -13,12 +13,12 @@ describe("gate interaction", () => {
 	it("offers the open prompt for a closed gate in range", () => {
 		const nearby = nearbyGate([gate(4, 4, false)], { x: 256, y: 288 });
 		expect(nearby?.gate).toMatchObject({ x: 4, y: 4 });
-		expect(nearby?.prompt).toBe("Press E or Enter to open gate");
+		expect(nearby?.prompt).toBe("Press E to open gate");
 	});
 
 	it("offers the close prompt once the gate is open", () => {
 		const nearby = nearbyGate([gate(4, 4, true)], { x: 256, y: 288 });
-		expect(nearby?.prompt).toBe("Press E or Enter to close gate");
+		expect(nearby?.prompt).toBe("Press E to close gate");
 	});
 
 	it("ignores gates outside the interaction radius and picks the closest", () => {

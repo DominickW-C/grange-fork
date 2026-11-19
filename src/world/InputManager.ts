@@ -1,3 +1,6 @@
+import { isChatComposing } from "../chat/chatStore";
+import { isTypingTarget } from "../chat/typing";
+
 export interface InputVector {
 	x: number;
 	y: number;
@@ -12,6 +15,9 @@ export class InputManager {
 
 	constructor() {
 		this.boundKeyDown = (event) => {
+			// Chat and other form fields own the keyboard. Skipping here also
+			// keeps Space/arrow default actions intact while typing.
+			if (isTypingTarget(event.target) || isChatComposing()) return;
 			if (
 				["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(
 					event.code,
@@ -38,6 +44,7 @@ export class InputManager {
 	}
 
 	getMovementVector(): InputVector {
+		if (isChatComposing()) return { x: 0, y: 0 };
 		let x = 0;
 		let y = 0;
 		if (this.activeKeys.has("KeyA") || this.activeKeys.has("ArrowLeft")) x -= 1;
@@ -55,6 +62,7 @@ export class InputManager {
 	}
 
 	consumePress(...codes: string[]): boolean {
+		if (isChatComposing()) return false;
 		const pressed = codes.some((code) => this.pressedKeys.has(code));
 		for (const code of codes) this.pressedKeys.delete(code);
 		return pressed;

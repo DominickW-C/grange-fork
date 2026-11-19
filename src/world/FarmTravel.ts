@@ -30,7 +30,7 @@ export class FarmTravel {
 		if (!isOwner || !house) return null;
 		const distance = Math.hypot(player.x - house.x, player.y - house.y);
 		return distance <= FARM_HOUSE_REACH
-			? "Press E or Enter to enter the farmhouse"
+			? "Press E to enter the farmhouse"
 			: null;
 	}
 
@@ -58,19 +58,19 @@ export class FarmTravel {
 		// before the house menu.
 		if (npcPrompt && onTalkToNpc) {
 			this.setPrompt(npcPrompt);
-			if (input.consumePress("KeyE", "Enter")) onTalkToNpc();
+			if (input.consumePress("KeyE")) onTalkToNpc();
 			return;
 		}
 		if (housePrompt && onOpenHouse) {
 			this.setPrompt(housePrompt);
-			if (input.consumePress("KeyE", "Enter")) onOpenHouse();
+			if (input.consumePress("KeyE")) onOpenHouse();
 			return;
 		}
 		const canBoard =
 			isNearFarmTrain(player.pos.x, player.pos.y) && train.canBoard();
-		this.setPrompt(canBoard ? "Press E or Enter to board the train" : null);
+		this.setPrompt(canBoard ? "Press E to board the train" : null);
 		if (!canBoard) return;
-		if (!input.consumePress("KeyE", "Enter")) return;
+		if (!input.consumePress("KeyE")) return;
 		this.setPrompt(null);
 		this.onOpenMenu();
 	}

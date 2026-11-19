@@ -54,6 +54,9 @@ Grange is a peaceful farming game with a hub world:
   can be dug up and moved.
 - A placeholder farmhand beside the farmhouse runs a short starter quest:
   welcome, hand in ten tomatoes, then ten lettuce and ten wheat.
+- Chat with the people in the room you are in: your farm's visitors, or
+  everyone in town (marketplace, casino, bank, livestock market). Press Enter
+  to type; game notices share the same feed.
 
 The game is under active course-project development. Some UI is stubbed
 (Settings, whitelist management, some market tabs) and some behavior is
@@ -256,7 +259,7 @@ path serves the built `index.html`.
 
 ### 5.6 Phoenix Channels protocol
 
-The SPA uses one shared socket and three channel families:
+The SPA uses one shared socket and four channel families:
 
 #### `lobby`
 
@@ -305,6 +308,7 @@ Client events:
 | `npcSell` | `{item: cropId}` | farm owner only | `{npc, balance}` | `{error: reason}` |
 | `updateSettings` | `{is_public?, visitor_edit?}` | farm owner only | `{farm}` | `{error: reason}` |
 | `move` | `{x, y}` | any joined user | `:ok` | `{error: "move ignored"}` |
+| `chat` | `{text}` | any joined user | `:ok` | `{error: reason}` |
 | `pausePresence` | `{}` | any joined user | `:ok` | `{error: reason}` |
 | `resumePresence` | `{}` | any joined user | `:ok` | `{error: reason}` |
 
@@ -331,6 +335,28 @@ Farm presence is cosmetic and keyed by username, exactly like hub presence. It
 lives on this channel; there is no separate farm-presence channel or table.
 Entering a hub sends `pausePresence` (the channel stays joined so owner-only
 actions still work) and returning sends `resumePresence`.
+
+Farm chat rides this channel too (see [Room chat](#511-room-chat)): the
+`chat` event broadcasts to the room, and `intercept(["chat"])` lets
+`handle_out/3` drop lines for a socket whose presence is paused. That is how a
+visitor who walked into town stops hearing the farm behind them while keeping
+the channel for owner-only actions.
+
+#### `chat:town`
+
+One shared town room for every non-farm area: marketplace, casino, bank, and
+livestock market. It is deliberately **not** split per area, so a shopper and
+a card player can talk; farms never join it.
+
+- Join requires a signed-in socket (`{"error": "not logged in"}` otherwise);
+  the reply is `{ "room": "town" }`. Any other topic is `"unknown room"`.
+- Client event `chat` with `{text}` broadcasts
+  `{author, text, at}` to every joined socket, including the sender. The author
+  always comes from the session, never the payload.
+- Nothing is stored and nothing is replayed on join: chat is ephemeral, so
+  leaving the room (or the page) loses the history.
+- There is no presence on this channel; hub presence still lives on
+  `hub:<area>`.
 
 #### `hub:<area>`
 
@@ -413,7 +439,7 @@ Market behavior:
 - `casino` → `CasinoScene`
 
 `MarketplaceScene` and `CasinoScene` extend `WalkingScene`, which provides
-WASD/arrow movement, obstacle collision, `E`/`Enter` interactions, prompts, and
+WASD/arrow movement, obstacle collision, `E` interactions, prompts, and
 scene travel. `FarmMapScene` is more specialized: farming tools, pointer
 painting, hover readout, fences/gates, prop placement, combo tracker, train
 animation, and travel to the marketplace.
@@ -445,7 +471,7 @@ router with a one-shot `markTrainArrival()` flag; trips inside the local farm's
 world switch Excalibur scenes directly. Spawn points live in `mapData.ts`,
 `marketplaceData.ts`, and `casinoData.ts`.
 
-The owner opens the `HouseMenu` by pressing `E`/`Enter` within
+The owner opens the `HouseMenu` by pressing `E` within
 `FARM_HOUSE_REACH` of the farmhouse. It toggles `is_public` and `visitor_edit`;
 both overlays pause the active scene while open.
 
@@ -502,6 +528,44 @@ single-use token machinery backs both email verification and password reset.
   pins `GRANGE_MAILER=console` so a developer's real `.env` doesn't force
   actual sending during tests.
 
+### 5.11 Room chat
+
+Player chat is scoped to the room the player is standing in and shares the
+bottom-left feed with game notices.
+
+- **Rooms.** A farm is its own room (`farm:<owner>`); every non-farm area
+  (marketplace, casino, bank, livestock market) shares one town room
+  (`chat:town`). Farms never join the town room and town areas never join a
+  farm's room.
+- **Wire shape.** Both rooms broadcast `chat` → `{author, text, at}`. `author`
+  is the socket session's username, `at` is epoch ms; neither is accepted from
+  the client.
+- **Ephemeral.** Nothing is persisted. A join replays no history, and leaving
+  a room drops that room's player lines from the local feed
+  (`clearPlayerMessages/0`), while `[GRANGE]` notices stay.
+- **Limits.** `Grange.Chat.normalize/1` drops control characters, collapses
+  whitespace, trims, and accepts 1..200 characters. `Grange.Chat.throttle/2`
+  allows 5 sends per 3 s per socket. Errors are short lowercase strings
+  (`"message is empty"`, `"message is too long"`, `"slow down"`) shown in the
+  feed.
+- **Composer.** `Enter` opens the composer (`src/chat/ChatInput.tsx`), `Enter`
+  sends, `Escape` cancels. `E` is the only interact key now; the old
+  `E`/`Enter` alias is gone so Enter can never interact by accident.
+- **Input freeze.** `isChatComposing()` (`src/chat/chatStore.ts`) makes
+  `InputManager` ignore movement/interact keys, and `WalkingScene`,
+  `FarmMapScene`, and `FarmToolInput` freeze the player while the composer is
+  open. Typing never walks the farmer or fires a tool.
+- **Room changes.** `src/chat/chatClient.ts` owns both channels: `socket.ts`
+  binds/unbinds the farm channel as visits start/pause/end, and
+  `useChatRoom(area)` joins/leaves the town room from `FarmMap`. A visitor who
+  travels into town keeps the farm channel for owner-only actions but stops
+  hearing farm chat (`:chat_active` + `intercept(["chat"])`).
+- **Feed.** The feed keeps the last 30 notices and renders the last 5 as
+  `[AUTHOR] text` (or `[GRANGE] text`), fading after 6 s of silence and
+  staying visible while the composer is open.
+
+See `notes/chat.md` for the client flow and test coverage.
+
 ---
 
 ## 6. Repository map
@@ -533,6 +597,7 @@ single-use token machinery backs both email verification and password reset.
 │   ├── useSession.ts          ← session resolution
 │   ├── routes/                ← MainMenu, Login, VerifyEmail, ForgotPassword, ResetPassword, Dashboard, RequireAuth
 │   ├── inventory/             ← hotbar, inventory modal, item registry, keys
+│   ├── chat/                  ← room chat client, composer, typing guard
 │   ├── notifications/         ← bottom-left feed store + component
 │   ├── pause/                 ← pause menu overlay + store
 │   └── world/
@@ -567,6 +632,7 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── repo.ex            ← Ecto SQLite repo
 │   │   ├── accounts.ex        ← registration/login/sessions/password reset
 │   │   ├── auth_token.ex       ← one-time verify/reset tokens
+│   │   ├── chat.ex             ← chat normalization + burst throttle
 │   │   ├── mailer.ex           ← mail behaviour + templates
 │   │   ├── mailer/{console,mailtrap}.ex ← dev console / Mailtrap adapters
 │   │   ├── farm_store.ex      ← farm transactions, views, tick, broadcasts
@@ -586,8 +652,8 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── endpoint.ex        ← socket + static + session + router
 │   │   ├── router.ex          ← /api routes + SPA fallback
 │   │   ├── user_socket.ex     ← token auth in connect params
-│   │   ├── presence.ex        ← ephemeral hub presence tracker
-│   │   ├── channels/{lobby,farm,hub}_channel.ex
+│   │   ├── presence.ex        ← ephemeral hub/farm presence tracker
+│   │   ├── channels/{lobby,farm,hub,chat}_channel.ex
 │   │   └── controllers/{auth,economy,health,page,dev,fallback}_controller.ex
 │   ├── priv/repo/migrations/  ← auto-run on boot
 │   └── test/                  ← ExUnit + support helpers + Credo checks
@@ -600,6 +666,7 @@ single-use token machinery backs both email verification and password reset.
 ### Important note about `notes/`
 
 - `notes/farming-mechanics.md` is the best gameplay reference.
+- `notes/chat.md` documents room chat, the composer, and its tests.
 - `notes/sqlite-plan.md` is a **historical design proposal**. The current
   `FarmStore` is a plain module that reads/writes Ecto directly — it is not the
   write-behind cache described there. Trust the code.
@@ -633,6 +700,13 @@ sprinklers, props, farmhand quests, then farms.
 ### 7.2 Wire types (`shared/types.ts`)
 
 ```ts
+/** One line of room-scoped player chat; ephemeral, never persisted. */
+export interface ChatLine {
+  author: string; // server session username
+  text: string;   // 1..200 chars, whitespace collapsed
+  at: number;     // epoch ms, server-stamped
+}
+
 export type FarmTileState = "tilled" | "planted" | "watered" | "ready";
 
 export interface FarmTile {
@@ -834,7 +908,7 @@ chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
   re-aims adjacent gates: horizontal neighbor wins, then vertical, then
   horizontal default.
 - A closed gate blocks like a fence; an open gate removes only the rail it
-  covers. Anyone (including visitors) within 90px can press `E`/`Enter` to
+  covers. Anyone (including visitors) within 90px can press `E` to
   toggle a gate.
 - Shoveling a fence/gate returns it to the owner's supply. Shoveling a movable
   prop puts it in `prop_inventory`.
@@ -873,7 +947,7 @@ Each farm row carries two flags, both defaulting to off:
   re-reads it on every action, so revoking it blocks the next action
   immediately (there is no push that evicts an in-flight request).
 
-The owner opens the `HouseMenu` with `E`/`Enter` within `FARM_HOUSE_REACH` of
+The owner opens the `HouseMenu` with `E` within `FARM_HOUSE_REACH` of
 the farmhouse and toggles both flags through `updateSettings`.
 
 What visitors may do while `visitor_edit` is on:
@@ -1140,6 +1214,12 @@ reason (the repo already has one for a deliberate hook dependency).
   failure. `waitForHubPeer`/`waitForHubPeerGone` read `data-hub-peers`;
   `waitForFarmPeer`/`waitForFarmPeerGone` read `data-farm-peers`; the house
   menu uses `house-menu` / `house-visibility-toggle` / `house-edit-toggle`.
+- Chat helpers live in `e2e/support/chat.ts`: `openChat` presses Enter,
+  `sendChat` types and sends, and `expectChatLine` / `expectNoChatLine` /
+  `expectChatCleared` / `expectGameNotice` read the feed's `[AUTHOR] text`
+  lines. `chat.spec.ts` covers town rooms across deep-linked areas, farm
+  delivery, leaving a room, the typing freeze, and `[GRANGE]` notices. It uses
+  `test.setTimeout(240_000)` because the farm case rides the train twice.
 - One spec file per feature, not per overlay: `casino.spec.ts` is four
   deep-linked tests (one per table), not four files that each re-walk the
   world.
@@ -1404,6 +1484,18 @@ runs Gitleaks.
     `GLIBC_2.43`, `beam.smp` refused to start, and every deploy failed its
     health check while nginx served 502. Do not switch the deploy workflows
     back to `ubuntu-latest`; pick the newest image the hosts can load.
+41. **Chat is room-scoped and ephemeral.** Farm chat rides `farm:<owner>` and
+    is filtered per socket by `:chat_active`; every non-farm area shares
+    `chat:town`. Never broadcast chat on `lobby` or `hub:*`, never persist it,
+    and never replay it on join. Leaving a room clears that room's player
+    lines but keeps `[GRANGE]` notices.
+42. **Enter opens chat; `E` is the only interact key.** Do not reintroduce
+    `Enter` as an interact alias, and keep `isChatComposing()` in every input
+    path (`InputManager`, `WalkingScene`, `FarmMapScene`, `FarmToolInput`) so
+    typing never walks, interacts, or fires a tool.
+43. **The server owns chat identity and pacing.** Author and `at` come from the
+    session/clock, never the payload, and `Grange.Chat` enforces the 200-char
+    cap and the 5-per-3s burst limit. The client only displays ack errors.
 
 ---
 
@@ -1461,6 +1553,12 @@ them silently as part of an unrelated change; mention them in the PR.
 - Hub presence is per area: a player in the casino is invisible to players in
   the marketplace, and players on their farms are in no hub at all.
 - Farm presence is cosmetic only: no collision, chat, emotes, or persistence.
+- Chat has no history, moderation, mute, or report tools, and nothing is
+  persisted; a reload loses every line. The burst limit is per socket process,
+  so reconnecting resets it, and a player who leaves a room can no longer see
+  it at all (there is no scrollback).
+- Chat is not available on the dashboard, login, or main menu; the composer
+  only exists in the world HUD.
 - A private farm can still be reached by someone already inside; there is no
   kick and no in-place reconnect, and the client keeps the old snapshot.
 - Turning `visitor_edit` off blocks the next action but does not cancel one
@@ -1474,6 +1572,7 @@ them silently as part of an unrelated change; mention them in the PR.
 
 - `README.md` — setup, database location, tests, deploy.
 - `notes/farming-mechanics.md` — crop/mechanic reference and asset mapping.
+- `notes/chat.md` — room chat, composer, throttling, and tests.
 - `notes/hub-multiplayer.md` — hub channel, presence, rendering, tuning.
 - `notes/farm-multiplayer.md` — farm settings, visitor rules, farm presence.
 - `notes/npc-tutorial.md` — farmhand quest stages, prices, and test hook.

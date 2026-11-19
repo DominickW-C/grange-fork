@@ -1,5 +1,6 @@
 import * as ex from "excalibur";
 import type { HubArea } from "../../shared/types";
+import { isChatComposing } from "../chat/chatStore";
 import {
 	isInventoryBlockingInput,
 	useInventoryStore,
@@ -101,7 +102,13 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 
 	/** A shovel click on another hub player is a cosmetic bonk. */
 	private readonly handleHubClick = (evt: ex.PointerEvent): void => {
-		if (this.paused || this.traveling || isInventoryBlockingInput()) return;
+		if (
+			this.paused ||
+			this.traveling ||
+			isInventoryBlockingInput() ||
+			isChatComposing()
+		)
+			return;
 		const inventory = useInventoryStore.getState();
 		if (inventory.hotbar[inventory.selectedHotbar]?.itemId !== "shovel") return;
 		const target = this.hubPlayers?.bonkAt(evt.worldPos.x, evt.worldPos.y);
@@ -202,6 +209,12 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.bonkFx?.update(step);
 
 		if (!this.inputManager || this.paused) return;
+		// Typing in chat freezes the walker without dropping the hub peers.
+		if (isChatComposing()) {
+			this.player.vel = ex.Vector.Zero;
+			updateFarmerGraphics(this.player, { x: 0, y: 0 });
+			return;
+		}
 		// Freeze the player while a travel animation (the train leaving) plays.
 		if (this.traveling) {
 			this.player.vel = ex.Vector.Zero;
@@ -242,7 +255,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 					(candidate.radius ?? MAX_INTERACTION_DISTANCE),
 		);
 		this.setPrompt(interaction?.prompt ?? null);
-		if (interaction && this.inputManager.consumePress("KeyE", "Enter")) {
+		if (interaction && this.inputManager.consumePress("KeyE")) {
 			this.setPrompt(null);
 			if (interaction.action) {
 				interaction.action();

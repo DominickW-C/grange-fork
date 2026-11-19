@@ -28,6 +28,6 @@ export function npcPrompt(
 	if (!npc) return null;
 	const distance = Math.hypot(player.x - npc.x, player.y - npc.y);
 	return distance <= FARM_NPC_REACH
-		? `Press E or Enter to talk to ${FARM_NPC_NAME}`
+		? `Press E to talk to ${FARM_NPC_NAME}`
 		: null;
 }

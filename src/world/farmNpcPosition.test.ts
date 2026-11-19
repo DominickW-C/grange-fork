@@ -24,7 +24,7 @@ describe("npcPrompt", () => {
 
 	it("prompts when the player is close enough", () => {
 		expect(npcPrompt({ x: npc.x, y: npc.y + 20 }, npc)).toBe(
-			"Press E or Enter to talk to Walt",
+			"Press E to talk to Walt",
 		);
 	});
 

@@ -16,6 +16,15 @@ export interface HubPeer {
 	y: number;
 }
 
+/** One line of room-scoped player chat. Chat is ephemeral and never persisted. */
+export interface ChatLine {
+	/** Server-assigned from the socket session, never the payload. */
+	author: string;
+	text: string;
+	/** Epoch ms, stamped by the server. */
+	at: number;
+}
+
 /** One tile of a farm's field, as sent by the server. */
 export interface FarmTile {
 	x: number;

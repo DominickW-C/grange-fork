@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { isChatComposing } from "../chat/chatStore";
 import { usePauseStore } from "../pause/pauseStore";
 import { useInventoryStore } from "./inventoryStore";
 
@@ -28,6 +29,8 @@ export function useInventoryKeys(): void {
 		function onKeyDown(e: KeyboardEvent) {
 			if (e.metaKey || e.ctrlKey || e.altKey) return;
 			if (isTypingTarget(e.target)) return;
+			// The composer owns every key, including Escape (it closes itself).
+			if (isChatComposing()) return;
 
 			if (e.code === "Escape") {
 				e.preventDefault();

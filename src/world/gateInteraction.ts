@@ -25,8 +25,8 @@ export function nearbyGate(
 	return {
 		gate: closest.gate,
 		prompt: closest.gate.open
-			? "Press E or Enter to close gate"
-			: "Press E or Enter to open gate",
+			? "Press E to close gate"
+			: "Press E to open gate",
 	};
 }
 

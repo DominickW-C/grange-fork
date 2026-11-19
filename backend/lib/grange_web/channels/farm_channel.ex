@@ -13,8 +13,14 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
+  # Chat is the one event that must be filtered per socket: a visitor whose
+  # presence is paused (standing in town) keeps the channel for owner-only
+  # actions but must not hear the farm. Other events are pushed automatically.
+  intercept(["chat"])
+
   alias Grange.{
     BarnStorage,
+    Chat,
     FarmGateActions,
     FarmSettings,
     FarmStore,
@@ -52,12 +58,16 @@ defmodule GrangeWeb.FarmChannel do
         {:error, %{error: "farm is private"}}
 
       true ->
-        GrangeWeb.Endpoint.subscribe("farm:" <> owner)
         track(username, owner, nil, nil)
         send(self(), :after_join)
 
-        {:ok, %{farm: FarmStore.view(owner), npc: npc_status(owner, username)},
-         assign(socket, :owner, owner)}
+        socket =
+          socket
+          |> assign(:owner, owner)
+          |> assign(:chat_active, true)
+          |> assign(:chat_sent_at, [])
+
+        {:ok, %{farm: FarmStore.view(owner), npc: npc_status(owner, username)}, socket}
     end
   end
 
@@ -147,6 +157,16 @@ defmodule GrangeWeb.FarmChannel do
     {:reply, {:error, %{error: "move ignored"}}, socket}
   end
 
+  # Room chat: only this farm's current occupants can hear it. The author comes
+  # from the session, and a visitor who travelled into town has presence paused
+  # (see `handle_out/3`), so they stop hearing the farm behind them.
+  @impl true
+  def handle_in("chat", %{"text" => text}, socket), do: handle_chat(text, socket)
+
+  def handle_in("chat", _payload, socket) do
+    {:reply, {:error, %{error: "invalid message"}}, socket}
+  end
+
   # Farm presence is paused while the player travels into a hub; the channel
   # stays joined so owner-only actions such as selling produce still work.
   @impl true
@@ -154,7 +174,7 @@ defmodule GrangeWeb.FarmChannel do
     with %{username: username} <- socket.assigns[:user],
          owner when is_binary(owner) <- socket.assigns[:owner] do
       Presence.untrack(self(), "farm:" <> owner, username)
-      {:reply, :ok, socket}
+      {:reply, :ok, assign(socket, :chat_active, false)}
     else
       _ -> {:reply, {:error, %{error: "not logged in"}}, socket}
     end
@@ -165,16 +185,37 @@ defmodule GrangeWeb.FarmChannel do
     with %{username: username} <- socket.assigns[:user],
          owner when is_binary(owner) <- socket.assigns[:owner] do
       track(username, owner, nil, nil)
-      {:reply, :ok, socket}
+      {:reply, :ok, assign(socket, :chat_active, true)}
     else
       _ -> {:reply, {:error, %{error: "not logged in"}}, socket}
     end
   end
 
+  # Farm chat is room-scoped, not subscription-scoped: a player whose presence
+  # is paused (standing in town) keeps the channel for owner-only actions but
+  # must not hear the farm behind them.
   @impl true
-  def handle_out(event, payload, socket) do
-    push(socket, event, payload)
+  def handle_out("chat", payload, socket) do
+    if socket.assigns[:chat_active], do: push(socket, "chat", payload)
     {:noreply, socket}
+  end
+
+  defp handle_chat(text, socket) do
+    user = socket.assigns[:user]
+    owner = socket.assigns[:owner]
+    now = System.monotonic_time(:millisecond)
+
+    with %{username: username} <- user,
+         true <- is_binary(owner),
+         {:ok, line} <- Chat.normalize(text),
+         {:ok, sent_at} <- Chat.throttle(socket.assigns[:chat_sent_at] || [], now) do
+      broadcast!(socket, "chat", Chat.line_payload(username, line))
+      {:reply, :ok, assign(socket, :chat_sent_at, sent_at)}
+    else
+      {:error, :slow_down} -> {:reply, {:error, %{error: "slow down"}}, socket}
+      {:error, reason} when is_binary(reason) -> {:reply, {:error, %{error: reason}}, socket}
+      _ -> {:reply, {:error, %{error: "not logged in"}}, socket}
+    end
   end
 
   # Farm actions require owner or an enabled visitor-edit flag.

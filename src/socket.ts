@@ -8,6 +8,7 @@ import type {
 	NpcQuestStatus,
 	Player,
 } from "../shared/types";
+import { bindFarmChat, unbindFarmChat } from "./chat/chatClient";
 import { countItem, useInventoryStore } from "./inventory/inventoryStore";
 import { reconcileServerItems } from "./inventory/itemSync";
 import type { ItemId } from "./inventory/items";
@@ -155,6 +156,7 @@ export function emitVisitFarm(
 		if (presence) {
 			farmPresencePaused = false;
 			attachFarmPresence(farmChannel);
+			bindFarmChat(farmChannel, owner);
 			farmChannel.push("resumePresence", {});
 		}
 		cb?.({ ok: true });
@@ -192,9 +194,11 @@ export function emitVisitFarm(
 			if (previous && previous !== channel) previous.leave();
 			if (farmPresencePaused) {
 				resetFarmPresence();
+				unbindFarmChat();
 				channel.push("pausePresence", {});
 			} else {
 				attachFarmPresence(channel);
+				bindFarmChat(channel, owner);
 			}
 			cb?.({ ok: true, farm });
 		})
@@ -217,6 +221,7 @@ export function emitLeaveFarm(cb?: (res: Ack) => void): void {
 export function emitPauseFarmVisit(cb?: (res: Ack) => void): void {
 	farmPresencePaused = true;
 	resetFarmPresence();
+	unbindFarmChat();
 	farmChannel?.push("pausePresence", {});
 	cb?.({ ok: true });
 }
@@ -227,6 +232,7 @@ function leaveFarmChannel(clearFarm: boolean): void {
 	farmOwner = null;
 	farmPresencePaused = false;
 	resetFarmPresence();
+	unbindFarmChat();
 	useNpcStore.getState().setStatus(null);
 	channel?.leave();
 	if (clearFarm) useGameStore.getState().setActiveFarm(null);

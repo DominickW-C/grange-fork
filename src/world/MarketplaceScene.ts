@@ -49,14 +49,14 @@ export class MarketplaceScene extends WalkingScene {
 			interactions: [
 				{
 					position: ex.vec(MARKETPLACE_TRAIN_STOP.x, MARKETPLACE_TRAIN_STOP.y),
-					prompt: "Press E or Enter to board the train",
+					prompt: "Press E to board the train",
 					canInteract: () => this.train?.canBoard() ?? false,
 					action: onOpenTravel,
 				},
 				{
 					position: ex.vec(MARKETPLACE_BANK_ENTRANCE.x, MARKETPLACE_BANK_ENTRANCE.y),
 					destination: "bank",
-					prompt: "Press E or Enter to enter the bank",
+					prompt: "Press E to enter the bank",
 					radius: 72,
 				},
 				{
@@ -64,7 +64,7 @@ export class MarketplaceScene extends WalkingScene {
 						MARKETPLACE_HARDWARE_ENTRANCE.x,
 						MARKETPLACE_HARDWARE_ENTRANCE.y,
 					),
-					prompt: "Press E or Enter to shop at the hardware store",
+					prompt: "Press E to shop at the hardware store",
 					radius: 95,
 					action: () => onOpenMarket("hardware"),
 				},
@@ -74,7 +74,7 @@ export class MarketplaceScene extends WalkingScene {
 						MARKETPLACE_LIVESTOCK_ENTRANCE.y,
 					),
 					destination: "livestock-market",
-					prompt: "Press E or Enter to enter the livestock market",
+					prompt: "Press E to enter the livestock market",
 					radius: 72,
 				},
 				{
@@ -83,7 +83,7 @@ export class MarketplaceScene extends WalkingScene {
 						MARKETPLACE_CASINO_ENTRANCE.y,
 					),
 					destination: "casino",
-					prompt: "Press E or Enter to enter the casino",
+					prompt: "Press E to enter the casino",
 					radius: 105,
 				},
 				{
@@ -91,7 +91,7 @@ export class MarketplaceScene extends WalkingScene {
 						MARKETPLACE_SEED_MARKET_ENTRANCE.x,
 						MARKETPLACE_SEED_MARKET_ENTRANCE.y,
 					),
-					prompt: "Press E or Enter to enter the seed market",
+					prompt: "Press E to enter the seed market",
 					radius: 95,
 					action: () => onOpenMarket("seed"),
 				},
@@ -100,7 +100,7 @@ export class MarketplaceScene extends WalkingScene {
 						MARKETPLACE_PRODUCE_MARKET_ENTRANCE.x,
 						MARKETPLACE_PRODUCE_MARKET_ENTRANCE.y,
 					),
-					prompt: "Press E or Enter to enter the produce market",
+					prompt: "Press E to enter the produce market",
 					radius: 95,
 					action: () => onOpenMarket("produce"),
 				},

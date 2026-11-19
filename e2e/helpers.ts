@@ -21,6 +21,14 @@ export {
 	worldUrl,
 } from "./support/auth";
 export {
+	expectChatCleared,
+	expectChatLine,
+	expectGameNotice,
+	expectNoChatLine,
+	openChat,
+	sendChat,
+} from "./support/chat";
+export {
 	clickFarmTile,
 	clickWorld,
 	farmTilePosition,
