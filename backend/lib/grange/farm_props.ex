@@ -21,10 +21,23 @@ defmodule Grange.FarmProps do
     13 => {"daisies", 52},
     14 => {"marigolds", 52},
     15 => {"blue-flowers", 50},
-    16 => {"daisies", 50}
+    16 => {"daisies", 50},
+    17 => {"greenhouse", 260}
   }
 
+  @starter_carried [
+    %{source_index: 17, asset: "greenhouse", x: 0, y: 0, carried: true}
+  ]
+
   def asset(index), do: @assets[index]
+
+  @doc "Ensures starter carried props exist in inventory for this owner."
+  @spec ensure(String.t()) :: :ok
+  def ensure(owner) do
+    rows = Enum.map(@starter_carried, &Map.put(&1, :owner, owner))
+    Repo.insert_all(FarmProp, rows, on_conflict: :nothing)
+    :ok
+  end
 
   def overrides(owner) do
     Repo.all(from(p in FarmProp, where: p.owner == ^owner, order_by: p.source_index))

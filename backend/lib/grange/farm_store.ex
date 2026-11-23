@@ -56,6 +56,7 @@ defmodule Grange.FarmStore do
     end
 
     Inventory.ensure(owner)
+    FarmProps.ensure(owner)
     view(owner)
   end
 

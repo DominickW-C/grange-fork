@@ -12,6 +12,7 @@ import { propBlocking, props } from "./mapData";
 const ASPECTS: Record<string, number> = {
 	farmhouse: 562 / 581,
 	barn: 593 / 587,
+	greenhouse: 512 / 565,
 	well: 315 / 291,
 	bench: 222 / 318,
 	sign: 271 / 203,

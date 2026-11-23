@@ -56,6 +56,7 @@ export const sweepFxImages = [
 export const propImages: Record<PropKey, ex.ImageSource> = {
 	farmhouse: image("farm/buildings/farmhouse.webp"),
 	barn: image("farm/buildings/barn.webp"),
+	greenhouse: image("farm/buildings/greenhouse.webp"),
 	"oak-tree": image("farm/plants/oak-tree.webp"),
 	"pine-tree": image("farm/plants/pine-tree.webp"),
 	"apple-tree": image("farm/plants/apple-tree.webp"),

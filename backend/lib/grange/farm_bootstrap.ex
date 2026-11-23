@@ -15,6 +15,12 @@ defmodule Grange.FarmBootstrap do
     now = DateTime.utc_now()
     row = %{owner: owner, inserted_at: now, updated_at: now}
     {count, _rows} = Repo.insert_all(FarmRecord, [row], on_conflict: :nothing)
-    if count == 1, do: :created, else: :existing
+
+    if count == 1 do
+      Grange.FarmProps.ensure(owner)
+      :created
+    else
+      :existing
+    end
   end
 end

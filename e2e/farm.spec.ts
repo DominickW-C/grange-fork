@@ -321,3 +321,19 @@ test("a visitor sees another farm read-only but can toggle its gates", async ({
 		"visitor editing off",
 	);
 });
+
+test("greenhouse starts in inventory, places on clear ground, and shovels up", async ({ page }) => {
+	await registerFast(page, uniqueName("Gardener"));
+
+	const slot = page.locator('[data-item="greenhouse"]');
+	await expect(slot).toHaveCount(1);
+	await slot.click();
+
+	await tapFarmTile(page, 8, 6);
+	await expect(slot).toHaveCount(0);
+
+	await page.keyboard.press("7");
+	await movePlayerIntoReach(page, 544, 380);
+	await clickWorld(page, 544, 380);
+	await expect(slot).toHaveCount(1);
+});

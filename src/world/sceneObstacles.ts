@@ -12,6 +12,7 @@ import {
 export const farmFootprints: Partial<Record<PropKey, PropFootprint>> = {
 	farmhouse: { width: 0.9, depth: 130 },
 	barn: { width: 0.9, depth: 135 },
+	greenhouse: { width: 0.9, depth: 130 },
 	"oak-tree": { width: 0.38, depth: 27 },
 	"pine-tree": { width: 0.35, depth: 25 },
 	"apple-tree": { width: 0.38, depth: 27 },

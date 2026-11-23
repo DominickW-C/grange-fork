@@ -58,6 +58,7 @@ export type TerrainKey =
 export type PropKey =
 	| "farmhouse"
 	| "barn"
+	| "greenhouse"
 	| "oak-tree"
 	| "pine-tree"
 	| "apple-tree"
@@ -75,6 +76,7 @@ export type MovablePropKey = Exclude<PropKey, "starter-train">;
 export const MOVABLE_PROP_ASSETS: readonly MovablePropKey[] = [
 	"farmhouse",
 	"barn",
+	"greenhouse",
 	"well",
 	"bench",
 	"sign",
@@ -89,6 +91,9 @@ export const MOVABLE_PROP_ASSETS: readonly MovablePropKey[] = [
 ];
 export const isMovablePropAsset = (asset: string): asset is MovablePropKey =>
 	MOVABLE_PROP_ASSETS.includes(asset as MovablePropKey);
+
+/** Props that start carried in inventory rather than placed on the map. */
+export const STARTER_CARRIED_PROPS: ReadonlySet<number> = new Set<number>([17]);
 
 /** Props the owning scene animates itself (currently only the train), so the
  * static prop renderers must skip drawing a still copy of them. */
@@ -205,6 +210,7 @@ export type PropBlockingRule = "rect" | "base" | "none";
 export const propBlocking: Record<PropKey, PropBlockingRule> = {
 	farmhouse: "rect",
 	barn: "rect",
+	greenhouse: "rect",
 	"oak-tree": "base",
 	"pine-tree": "base",
 	"apple-tree": "base",
@@ -237,6 +243,7 @@ export const props: MapProp[] = [
 
 	{ asset: "daisies", x: 330, y: 225, width: 52 },
 	{ asset: "marigolds", x: 750, y: 225, width: 52 },
-	{ asset: "blue-flowers", x: 1015, y: 410, width: 50 },
+	{ asset: "blue-flowers", x: 1080, y: 410, width: 50 },
 	{ asset: "daisies", x: 150, y: 475, width: 50 },
+	{ asset: "greenhouse", x: 920, y: 480, width: 260 },
 ];

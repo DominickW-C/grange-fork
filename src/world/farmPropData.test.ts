@@ -7,6 +7,19 @@ describe("per-farm movable props", () => {
 		expect(movablePropAt(0)).toBe("farmhouse");
 		expect(movablePropAt(1)).toBe("barn");
 		expect(movablePropAt(12)).toBeNull();
+		expect(movablePropAt(17)).toBe("greenhouse");
+	});
+
+	it("renders a placed greenhouse once placed with an override", () => {
+		const placed = placedFarmProps([
+			{ index: 17, asset: "greenhouse", x: 400, y: 300, carried: false },
+		]);
+		expect(placed).toHaveLength(18);
+		expect(placed.find(({ index }) => index === 17)).toMatchObject({
+			asset: "greenhouse",
+			x: 400,
+			y: 300,
+		});
 	});
 
 	it("removes a carried prop and restores it at its saved position", () => {

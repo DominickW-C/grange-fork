@@ -241,6 +241,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 		icon: "/assets/farm/buildings/farmhouse.webp", description: "Place your farmhouse on clear ground." },
 	barn: { id: "barn", name: "Barn", kind: "building", maxStack: 99,
 		icon: "/assets/farm/buildings/barn.webp", description: "Place your barn on clear ground." },
+	greenhouse: { id: "greenhouse", name: "Greenhouse", kind: "building", maxStack: 99,
+		icon: "/assets/farm/buildings/greenhouse.webp", description: "Place your greenhouse on clear ground." },
 	well: { id: "well", name: "Well", kind: "building", maxStack: 99,
 		icon: "/assets/farm/objects/well.webp", description: "Place a well on clear ground." },
 	bench: { id: "bench", name: "Bench", kind: "building", maxStack: 99,

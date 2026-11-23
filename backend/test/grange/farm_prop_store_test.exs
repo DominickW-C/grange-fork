@@ -30,15 +30,17 @@ defmodule Grange.FarmPropStoreTest do
   test "well and sign can be dug up, carried, placed, and reloaded per farm" do
     full_farm("Bob")
     assert {:ok, view} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 2})
-    assert view.prop_inventory == %{"well" => 1}
-    assert [%{index: 2, carried: true}] = view.prop_overrides
-    assert FarmStore.view("Bob").prop_overrides == []
+    assert view.prop_inventory == %{"well" => 1, "greenhouse" => 1}
+    assert Enum.any?(view.prop_overrides, &(&1.index == 2 and &1.carried))
+
+    assert [%{asset: "greenhouse", carried: true, index: 17}] =
+             FarmStore.view("Bob").prop_overrides
 
     assert {:error, "object is already in inventory"} =
              FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 2})
 
     assert {:ok, view} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 4})
-    assert view.prop_inventory == %{"well" => 1, "sign" => 1}
+    assert view.prop_inventory == %{"well" => 1, "sign" => 1, "greenhouse" => 1}
 
     assert {:ok, view} =
              FarmStore.prop_action("Alice", %{
@@ -48,7 +50,7 @@ defmodule Grange.FarmPropStoreTest do
                "y" => 416
              })
 
-    assert view.prop_inventory == %{"sign" => 1}
+    assert view.prop_inventory == %{"sign" => 1, "greenhouse" => 1}
 
     assert Enum.find(view.prop_overrides, &(&1.index == 2)) ==
              %{index: 2, asset: "well", x: 480, y: 416, carried: false}
@@ -100,10 +102,33 @@ defmodule Grange.FarmPropStoreTest do
   test "farmhouse and barn may be picked up while train remains placed" do
     assert {:ok, _} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 0})
     assert {:ok, view} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 1})
-    assert view.prop_inventory == %{"farmhouse" => 1, "barn" => 1}
-    assert Enum.count(view.prop_overrides, & &1.carried) == 2
+    assert view.prop_inventory == %{"farmhouse" => 1, "barn" => 1, "greenhouse" => 1}
+    assert Enum.count(view.prop_overrides, & &1.carried) == 3
 
     assert {:error, "that object cannot be dug up"} =
              FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 12})
+  end
+
+  test "greenhouse starts in inventory and can be placed and dug up" do
+    view = FarmStore.view("Alice")
+    assert view.prop_inventory["greenhouse"] == 1
+    assert Enum.any?(view.prop_overrides, &(&1.index == 17 and &1.carried))
+
+    assert {:ok, view} =
+             FarmStore.prop_action("Alice", %{
+               "kind" => "place",
+               "asset" => "greenhouse",
+               "x" => 480,
+               "y" => 416
+             })
+
+    assert view.prop_inventory["greenhouse"] == nil
+
+    assert Enum.find(view.prop_overrides, &(&1.index == 17)) ==
+             %{index: 17, asset: "greenhouse", x: 480, y: 416, carried: false}
+
+    assert {:ok, view} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 17})
+    assert view.prop_inventory["greenhouse"] == 1
+    assert Enum.find(view.prop_overrides, &(&1.index == 17)).carried == true
   end
 end

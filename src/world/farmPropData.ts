@@ -1,5 +1,11 @@
 import type { ActiveFarm } from "../../shared/types";
-import { isMovablePropAsset, props, type MapProp, type MovablePropKey } from "./mapData";
+import {
+	isMovablePropAsset,
+	props,
+	STARTER_CARRIED_PROPS,
+	type MapProp,
+	type MovablePropKey,
+} from "./mapData";
 
 export interface PlacedFarmProp extends MapProp { index: number }
 type Override = ActiveFarm["prop_overrides"][number];
@@ -9,6 +15,10 @@ export function placedFarmProps(overrides: Override[]): PlacedFarmProp[] {
 	const byIndex = new Map(overrides.map((change) => [change.index, change]));
 	return props.flatMap((original, index) => {
 		const change = byIndex.get(index);
+		if (STARTER_CARRIED_PROPS.has(index)) {
+			if (!change || change.asset !== original.asset || change.carried) return [];
+			return [{ ...original, x: change.x, y: change.y, index }];
+		}
 		if (!change || original.asset === "starter-train" || change.asset !== original.asset)
 			return [{ ...original, index }];
 		if (change.carried) return [];
