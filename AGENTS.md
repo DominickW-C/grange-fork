@@ -44,7 +44,8 @@ something new.
 Grange is a peaceful farming game with a hub world:
 
 - Start on your own farm with a run-down farmhouse, barn, fields, and a train.
-- Till, plant, water, and harvest crops. Crops can mutate into rare variants.
+- Till, plant, water, and harvest crops. Overnight catalysts can transform
+  standard crops into rare variants.
 - Buy seeds at the marketplace; sell produce from the barn.
 - Take the train between your farm, the marketplace, and the casino.
 - Casino games (blackjack, poker, roulette, slots) spend and return
@@ -53,6 +54,8 @@ Grange is a peaceful farming game with a hub world:
   public and let visitors farm, build, and move props.
 - Fences and gates are placed from the hotbar; props (buildings, trees, decor)
   can be dug up and moved.
+- A placeholder farmhand beside the farmhouse runs a short starter quest:
+  welcome, hand in ten tomatoes, then ten lettuce and ten wheat.
 
 The game is under active course-project development. Some UI is stubbed
 (Settings, whitelist management, some market tabs) and some behavior is
@@ -231,7 +234,8 @@ releases stay current; there is no separate release migration task.
 - Passwords are Argon2-hashed. Sessions are 30 days; only a SHA-256 hex hash of
   the token is stored.
 - `is_admin` is a DB flag. On sign-in the client grants the full item catalog
-  **client-side**; there is no server-side admin authorization middleware.
+  **client-side**; the temporary `/api/admin/item` spawner checks the flag
+  server-side before persisting durable items.
 
 ### 5.5 HTTP API (non-channel)
 
@@ -251,8 +255,13 @@ auth is the `_grange_key` cookie; the socket uses the token instead.
 | GET | `/api/auth/mailbox` | none | Dev/test only (`enable_test_routes`); returns the console mailer's last message for `?to=` |
 | POST | `/api/economy/transaction` | cookie | `{delta}` integer; clamped at zero |
 | POST | `/api/hardware/buy` | cookie | `{item, quantity}` → `{balance, sprinkler_count}` |
+| POST | `/api/admin/item` | admin cookie | Temporary creative spawner: `{item, count}` → `{count, items}` |
 | GET | `/api/state` | none | `{playerCount, farmCount}` |
 | POST | `/api/reset` | none | Dev/test only; wipes accounts and farms |
+| POST | `/api/dev/npc` | cookie | Dev/test only; forces farmhand stage/counters and fills the barn |
+| POST | `/api/dev/admin` | cookie | Dev/test only; promotes the signed-in account to admin |
+| POST | `/api/dev/item` | cookie | Dev/test only; grants catalyst items to the signed-in player |
+| POST | `/api/dev/dawn` | cookie | Dev/test only; forces pending catalysts to resolve |
 
 Unmatched `/api/*` routes return JSON 404 before the SPA fallback. Every other
 path serves the built `index.html`.
@@ -277,10 +286,12 @@ Join reply:
 
 #### `farm:<owner>`
 
-Join reply: `{ "farm": <ActiveFarm> }` followed by Phoenix
-`presence_state` / `presence_diff`. Only signed-in sockets may join. The
-joining account's own farm is created on demand (`FarmStore.ensure/1`) so its
-seed ledger exists even when it is only visiting.
+Join reply: `{ "farm": <ActiveFarm>, "npc": <NpcQuestStatus | null> }` followed
+by Phoenix `presence_state` / `presence_diff`. Only signed-in sockets may join.
+The joining account's own farm is created on demand (`FarmStore.ensure/1`) so
+its seed ledger exists even when it is only visiting. `npc` is the owner's
+farmhand quest state; visitors get `null`, which keeps the placeholder farmhand
+off their screen entirely.
 
 - The owner always joins their own farm.
 - A stranger may join only while the farm is public (`farms.is_public`).
@@ -289,17 +300,22 @@ seed ledger exists even when it is only visiting.
 
 Server pushes `farmUpdate` → `{ "farm": <ActiveFarm> }` after every successful
 change. There is **no partial/delta update**: the client replaces the whole
-active farm.
+active farm. The dev-only route `POST /api/dev/npc` also pushes
+`npcUpdate` → `{ "npc": <NpcQuestStatus> }` so a seeded quest reaches an open
+tab without a rejoin.
 
 Client events:
 
 | Event | Payload | Allowed caller | Success | Error |
 | --- | --- | --- | --- | --- |
-| `farmAction` | `{action: FarmAction}` | owner, or visitor while `visitor_edit` | `{seeds, drops}` | `{error, seeds}` |
+| `farmAction` | `{action: FarmAction}` | owner, or visitor while `visitor_edit` | `{seeds}` | `{error, seeds}` |
+| `useCatalyst` | `{item: catalystId}` | farm owner only | `{pending, items}` | `{error, items?}` |
 | `gateAction` | `{action: {kind: "toggle_gate", x, y}}` | any joined user | `:ok` | `{error: reason}` |
 | `farmPropAction` | `{action: {kind: "dig", index} \| {kind: "place", asset, x, y}}` | owner, or visitor while `visitor_edit`, or any admin | `:ok` | `{error: reason}` |
 | `barnAction` | `{action: {kind: "deposit" \| "withdraw", item, count}}` | farm owner only | `:ok` | `{error: reason}` |
 | `sellProduce` | `{item: cropId, count: integer}` | farm owner only | `:ok` | `{error: reason}` |
+| `npcIntroSeen` | `{}` | farm owner only | `{npc}` | `{error: reason}` |
+| `npcSell` | `{item: cropId}` | farm owner only | `{npc, balance}` | `{error: reason}` |
 | `updateSettings` | `{is_public?, visitor_edit?}` | farm owner only | `{farm}` | `{error: reason}` |
 | `move` | `{x, y}` | any joined user | `:ok` | `{error: "move ignored"}` |
 | `pausePresence` | `{}` | any joined user | `:ok` | `{error: reason}` |
@@ -321,8 +337,7 @@ Authorization rules (`FarmChannel`):
 - Prop actions follow the same `visitor_edit` gate, and admins may rearrange
   props on any farm they can join.
 - Barn storage actions, produce sales, and settings are owner-only.
-- Seed spending and mutation drops follow the actor; harvested produce goes to
-  the owner's barn.
+- Seed spending follows the actor; harvested produce goes to the owner's barn.
 
 Farm presence is cosmetic and keyed by username, exactly like hub presence. It
 lives on this channel; there is no separate farm-presence channel or table.
@@ -359,16 +374,15 @@ See `notes/hub-multiplayer.md` for the client flow and tuning constants.
    - records the combo (`ComboController`),
    - plays the scythe sweep FX,
    - possibly emits a combo-spread action to an orthogonal neighbor,
-   - emits `farmAction` with `{kind, x, y, crop?, tool?, comboMutationMultiplier?}`.
+   - emits `farmAction` with `{kind, x, y, crop?, tool?}`.
 5. `FarmChannel.handle_in("farmAction", ...)` authorizes the owner or a
    visitor while `visitor_edit` is on, then calls
    `FarmStore.action(owner, action, actor)`.
 6. `FarmStore` normalizes the action, runs it in an Ecto transaction, persists
-   the change, spends the actor's seed, persists any mutation drop in the
-   actor's inventory, and broadcasts `farmUpdate` + lobby `farms`. Harvested
-   produce goes to the owner's barn.
-7. The `farmAction` ack returns `{seeds, drops}` (or `{error, seeds}`); the
-   client applies the authoritative seed counts and announces any drop.
+   the change, spends the actor's seed, and broadcasts `farmUpdate` + lobby
+   `farms`. Harvested produce goes to the owner's barn.
+7. The `farmAction` ack returns `{seeds}` (or `{error, seeds}`); the
+   client applies the authoritative seed counts to the hotbar.
 8. `src/socket.ts` receives `farmUpdate`, calls
    `useGameStore.setActiveFarm(farm)`.
 9. `FarmMapScene.onPreUpdate` calls `FarmTileSync.sync()` and repaints only
@@ -450,13 +464,21 @@ The marketplace and casino are **hub areas**: a `WalkingScene` with `hubArea`
 joins `hub:<area>` on activate, leaves on deactivate, and publishes the local
 position at ~10 Hz while moving. `HubPlayers` renders the other players from
 `getHubPeers()`, easing them toward their reported positions with usernames
-above their heads.
+above their heads. The marketplace world is deliberately larger than the old
+hub canvas (`MARKETPLACE_MIN_COLUMN/ROW = -8`, max column 31 / row 11) to leave
+construction space above and on both sides; `WorldPosition.clamp_hub/3` clamps
+its presence to those bounds, while the casino keeps the original 18x12 map.
 
 Farms are not hubs, but they have their own `farm:<owner>` presence:
 `FarmScenePresence` publishes the local position and renders the other people
 in the same room through `getFarmPeers()`. `FarmMap` exposes the current hub and
 farm peer names as `data-hub-peers` / `data-farm-peers` for e2e tests; they are
 not rendered UI.
+
+Clicking another player while holding the shovel plays a client-only comic
+"BONK!" burst and knocks that avatar back; it works on farms (through
+`FarmToolInput` → `FarmScenePresence`) and in hubs (through `WalkingScene`). No
+server event is sent.
 
 ### 5.10 Email verification and password reset
 
@@ -512,7 +534,7 @@ single-use token machinery backs both email verification and password reset.
 │   ├── auth.ts                ← User/AuthUser/Session types
 │   ├── crops.ts               ← crop registry (single TS source of truth)
 │   ├── farm.ts                ← tile types, grid constants, crop encode/decode
-│   ├── mechanics.ts           ← combo/synergy/mutation tuning
+│   ├── mechanics.ts           ← combo/synergy tuning
 │   └── types.ts               ← channel/wire payload types
 ├── src/
 │   ├── main.tsx / App.tsx     ← bootstrap + routes
@@ -536,13 +558,15 @@ single-use token machinery backs both email verification and password reset.
 │       ├── mapData.ts         ← terrain/props/grid/spawn constants
 │       ├── marketplaceData.ts / casinoData.ts
 │       ├── testMode.ts        ← dev-only e2e hooks (boot scene, walk speed)
-│       ├── farmActions.ts     ← pure action resolution + synergy + drops
+│       ├── farmActions.ts     ← pure action resolution + synergy
 │       ├── farmActionRunner.ts← emit farming actions + combo/sweep
 │       ├── combo* / farmCombo ← combo tracker/controller/store/HUD
 │       ├── tileSync / farmSceneTiles / cropLayer
 │       ├── fence* / gateInteraction / blocking
 │       ├── farmProp* / propLayer / placement previews
-│       ├── marketData / useFarmMarket / MarketWindow
+│       ├── farmNpc / farmNpcPosition / npcQuest ← placeholder farmhand
+│       ├── NpcTradeWindow / useNpcTrade / npcStore / npcSocket
+│       ├── marketData / useFarmMarket / MarketWindow / seedShop
 │       ├── blackjack*, poker*, roulette*, slots* ← client-side casino games
 │       ├── resources.ts / *Resources.ts ← Excalibur image sources
 │       ├── worldAssets.ts     ← per-scene image groups + lazy loading
@@ -563,10 +587,13 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── farm.ex            ← pure tile state machine + bounds
 │   │   ├── hub.ex             ← hub area whitelist + position clamping
 │   │   ├── crops.ex           ← Elixir mirror of crop registry/mechanics
-│   │   ├── farm_action.ex     ← action opts + mutation drop roll
+│   │   ├── farm_action.ex     ← action opts + payload normalising
+│   │   ├── farm_catalyst.ex / farm_catalysts.ex ← pending overnight catalysts
+├── farm_broadcast.ex ← farm/lobby/catalyst PubSub fan-out
 │   │   ├── barn.ex / barn_item.ex
 │   │   ├── farm_fences.ex / farm_gates.ex / farm_props.ex
 │   │   ├── farm_gate_actions.ex ← visitor-safe gate toggle
+│   │   ├── npc_quest.ex / npc_quest_record.ex ← farmhand starter quest
 │   │   ├── farm_record.ex / tile.ex / user.ex / session.ex
 │   │   └── farm_fence.ex / farm_gate.ex / farm_prop.ex
 │   ├── lib/grange_web/
@@ -575,7 +602,7 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── user_socket.ex     ← token auth in connect params
 │   │   ├── presence.ex        ← ephemeral hub presence tracker
 │   │   ├── channels/{lobby,farm,hub}_channel.ex
-│   │   └── controllers/{auth,economy,health,page,fallback}_controller.ex
+│   │   └── controllers/{auth,economy,health,page,dev,fallback}_controller.ex
 │   ├── priv/repo/migrations/  ← auto-run on boot
 │   └── test/                  ← ExUnit + support helpers + Credo checks
 ├── e2e/                       ← Playwright specs + shared helpers
@@ -611,10 +638,12 @@ single-use token machinery backs both email verification and password reset.
 | `farm_gates` | `owner` FK, `x`, `y`, `direction`, `open` | Unique `(owner, x, y)`. `direction` is `horizontal` or `vertical`. |
 | `farm_sprinklers` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. `(x, y)` is the top-left tile of the watered 2x2; the object is drawn on that 2x2's shared corner. |
 | `farm_props` | `owner` FK, `source_index`, `asset`, `x`, `y`, `carried` | Unique `(owner, source_index)`. Indices map to the starter prop list. |
+| `farm_catalysts` | `owner` FK, `item`, `applies_at` integer ms | One pending overnight catalyst per `(owner, item)`. Removed when dawn applies it. |
+| `npc_quests` | `owner` FK, `stage`, `tomatoes_sold`, `lettuce_sold`, `wheat_sold` | One row per farm. `stage` is `intro`, `tomatoes`, `supplies`, or `complete`; counters cap at 10. |
 
 All foreign keys cascade on farm delete. `Accounts.reset/0` deletes sessions
 then users; `FarmStore.reset/0` deletes tiles, barn items, fences, gates,
-sprinklers, props, then farms.
+sprinklers, props, pending catalysts, farmhand quests, then farms.
 
 ### 7.2 Wire types (`shared/types.ts`)
 
@@ -661,7 +690,6 @@ export type FarmAction = {
   y: number;
   crop?: CropId;                       // plant only
   tool?: "hand" | "scythe";            // harvest only
-  comboMutationMultiplier?: number;    // 1 or 1.5
 };
 ```
 
@@ -674,16 +702,38 @@ train menu, so `is_public` is mostly a guard for stale snapshots.
 `FarmPropAction` is `{kind: "dig", index}` or
 `{kind: "place", asset, x, y}`.
 
+`NpcQuestStatus` is the owner's farmhand progress:
+
+```ts
+export type NpcStage = "intro" | "tomatoes" | "supplies" | "complete";
+
+export interface NpcQuestStatus {
+  stage: NpcStage;
+  tomatoes: number; // handed in so far, 0..10
+  lettuce: number;
+  wheat: number;
+}
+```
+
+It arrives in the `farm:<owner>` join reply (owner only) and in every
+`npcIntroSeen` / `npcSell` ack.
+
 ### 7.3 Coordinates, units, and grids
 
 - World size: `MAP_COLUMNS = 18`, `MAP_ROWS = 12`, `TILE_SIZE = 64`,
   `MAP_WIDTH = 1152`, `MAP_HEIGHT = 768`.
+- The farm world is larger than the hub canvas: `FARM_WORLD_MIN_COLUMN = -6`,
+  `FARM_WORLD_MAX_COLUMN = 24`, `FARM_WORLD_MIN_ROW = -4`,
+  `FARM_WORLD_MAX_ROW = 11` (31x16 tiles). `farmBounds(land_level)` controls
+  how much is owned/walkable; the fifth and final bank parcel unlocks the full
+  border. Keep `LAND_PRICES` and the Elixir `Grange.Land` bounds/prices in sync.
 - Farm actions are addressed by **map tile coordinates** `(column, row)`, not
-  field-local coordinates. The server accepts `x`/`y` in `0..14` for crop
-  actions (`Farm.in_bounds?/2`), even though the rendered field is a smaller
-  patch around columns 7–11 and rows 6–8.
-- Fences/gates use map coordinates with `x in 0..17` and `y in 0..9`; rows
-  10–11 are the river/shore.
+  field-local coordinates. Crop actions are valid across the full farm world
+  (`-6..24` columns, `-4..9` rows) but require ownership of the tile; the
+  original field around columns 7-11 and rows 6-8 is only where the starter
+  props leave open ground.
+- Fences/gates use map coordinates with `x in -6..25` and `y in -4..10`, clipped
+  by the current land bounds; rows 10–11 are the river/shore.
 - `FIELD_GRID` / `worldToFieldTile()` / `fieldTileToWorld()` exist but the live
   action path uses `Math.floor(worldX / TILE_SIZE)` directly. Do not assume
   actions are field-relative.
@@ -722,9 +772,9 @@ The authoritative TS registry is `shared/crops.ts`; the Elixir mirror is
 | Wheat | `wheat` | standard | 5 | 2 | 4 | scythe only | 1 | — | pack |
 | Lettuce | `lettuce` | standard | 5 | 4 | 7 | hand or scythe | 1 | — | moisture |
 | Tomato | `tomato` | standard | 5 | 8 | 5 | hand or scythe | 2 | 2 | space |
-| Midas Wheat | `midas_wheat` | rare | 4 | drop only | 10 | scythe only | 1 | — | pack |
-| Frost-Crisp Lettuce | `frost_lettuce` | rare | 4 | drop only | 15 | hand or scythe | 1 | — | moisture |
-| Sun-Burst Tomato | `sunburst_tomato` | rare | 3 | drop only | 8 | hand or scythe | 3 | 1 | space |
+| Midas Wheat | `midas_wheat` | rare | 4 | catalyst only | 30 | scythe only | 1 | — | pack |
+| Frost-Crisp Lettuce | `frost_lettuce` | rare | 4 | catalyst only | 45 | hand or scythe | 1 | — | moisture |
+| Sun-Burst Tomato | `sunburst_tomato` | rare | 3 | catalyst only | 24 | hand or scythe | 3 | 1 | space |
 
 Hand-harvest vs scythe:
 
@@ -745,7 +795,7 @@ Hand-harvest vs scythe:
   server tick nor the client applies it yet (see gaps).
 - **Tomato / Sun-Burst — Space-Hungry:** −20% growth if touching another
   tomato-family crop; +15% if touching lettuce.
-- Positive synergy for mutation rolls:
+- Positive synergy rules (still used by the pure grid helpers):
   - wheat: ≥2 adjacent growing wheat-family crops
   - lettuce: watered/ready and at least one growing neighbor
   - tomato: no tomato neighbors and ≥1 lettuce neighbor
@@ -753,15 +803,14 @@ Hand-harvest vs scythe:
 ### 8.3 Combo system
 
 The combo tracker is **client-side** (`src/world/comboTracker.ts` +
-`ComboController`). Only a boolean-ish mutation multiplier is sent to the
-server.
+`ComboController`). Combo state is not sent to the server anymore.
 
 | Streak | Window | Perk |
 | ---: | --- | --- |
 | 1–4 | 1.5s (plus a one-time +0.4s on hotbar swap) | Tracks streak; badge appears at 3+ |
 | 5–9 | 1.5s | +10% walk speed on farm tiles |
 | 10–14 | 1.5s | 15% chance to spread a water/scythe action to one valid orthogonal neighbor |
-| 15+ | 1.5s | 1.5× rare mutation seed drop multiplier |
+| 15+ | 1.5s | Tracks the highest tier (currently cosmetic; rare crops come from catalysts) |
 
 Higher tiers keep lower-tier perks: 15+ still has the speed bonus and the
 spread chance. `comboTier` picks one label, but `comboPerks` returns them all.
@@ -769,23 +818,33 @@ spread chance. `comboTier` picks one label, but `comboPerks` returns them all.
 Tuning lives in `shared/mechanics.ts` (and is mirrored in `Crops` where the
 server needs it).
 
-### 8.4 Rare mutation drops
+### 8.4 Rare-crop catalysts
 
-Rolled on a mature **standard** crop harvest:
+Standard crops no longer roll rare seeds on harvest. Three consumable items now
+queue an overnight transformation for the player's own farm:
 
-```
-chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
-```
+| Catalyst | Standard crop | Rare result |
+| --- | --- | --- |
+| Blizzard Vial | Lettuce | Frost-Crisp Lettuce |
+| Gilded Dust | Wheat | Midas Wheat |
+| Sun Shard | Tomato | Sun-Burst Tomato |
 
-`comboMultiplier` is `1.5` at combo 15+, else `1.0`. Maximum is `0.006` (0.6%).
+Using one consumes it from the owner's `player_items` ledger and inserts a
+`farm_catalysts` row. `FarmCatalysts.next_dawn_ms/1` targets the next day start;
+`FarmStore.tick/1` applies due rows, and a successful sleep calls
+`FarmStore.apply_dawn_catalysts/0` immediately. Applying rewrites every matching
+planted/watered/ready tile to the rare crop, preserving its state and timing
+while resetting the harvest count to the rare crop's full count.
 
-- The **server** rolls in `FarmAction.mutation_drops/5`, persists the drop in the
-  actor's seed inventory, and returns the item ids in the `farmAction` ack.
-- The client does not roll; it reads `drops` from the ack and shows a
-  "Rare <name>!" notice.
-- Sun-Burst Tomato declares a separate 10% bonus seed (`tomato-seed`) in the
-  registry, but nothing rolls it: the server harvest path ignores it and the
-  client has no local harvest simulation.
+The client uses a catalyst by right-clicking its inventory stack or selecting it
+in the hotbar and clicking the world. The server acks with the authoritative
+catalyst counts and broadcasts `catalystApplied` once the dawn transformation
+runs. Catalysts are dev/admin-only for now: admins are granted all three on
+lobby join, and the dev-only `POST /api/dev/item` / `POST /api/dev/dawn` routes
+support manual and e2e testing. Admins also get a temporary creative spawner in
+the inventory modal, backed by `POST /api/admin/item`, to re-grant catalysts and
+other items without reloading. Old rare seed items still exist and can be
+planted if held, but nothing drops them anymore.
 
 ### 8.5 Fences, gates, and props
 
@@ -793,7 +852,13 @@ chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
 - Owners place them from the hotbar: Gate = slot 5/key `5`, Fence = slot
   6/key `6`, Shovel = slot 7/key `7`.
 - Default supply: 20 fences, 2 gates; tracked on `farms.fence_count` /
-  `farms.gate_count`.
+  `farms.gate_count`. The hotbar mirrors that supply; when it hits zero the
+  stack leaves the inventory (no zero-count "phantom" icon), and the next
+  hardware purchase refills the first free slot.
+- Fence posts sit on tile corners, including the outer corners of the owned
+  land (`x minColumn..maxColumn+1`, `y minRow..10`). The bottom-center HUD only
+  makes the hotbar clickable so the southern border stays reachable behind the
+  status readout.
 - Rails are derived from neighboring posts. Placing or removing any post
   re-aims adjacent gates: horizontal neighbor wins, then vertical, then
   horizontal default.
@@ -849,10 +914,10 @@ What visitors may do while `visitor_edit` is on:
 Regardless of editing, visitors may walk around and toggle gates. Selling
 produce, buying livestock, the bank, fishing, and settings are owner-only.
 
-Ownership of the farm state is shared, but seed spending and rare mutation
-drops follow the **actor**, while harvested produce goes to the **owner's**
-barn. `FarmChannel` authorizes against the persisted flags; the client
-`canEditFarm()` helper is only the UI gate.
+Ownership of the farm state is shared, but seed spending follows the **actor**,
+while harvested produce goes to the **owner's** barn. `FarmChannel` authorizes
+against the persisted flags; the client `canEditFarm()` helper is only the UI
+gate.
 
 Private farms are omitted from the dashboard's open-farm list and from the
 train destination menu. They are hidden, not shown as locked rows.
@@ -877,6 +942,34 @@ the client repaints it as grass.
   the updated farm. `tilled_at` is server-only and is not sent over the wire.
 - The server owns the rule; the client only repaints what `farmUpdate`
   delivers.
+
+### 8.8 Farmhand starter quest
+
+A placeholder farmhand (a plain brown rectangle named "Walt") stands beside the
+owner's farmhouse and runs a two-stage selling tutorial. He is owner-only: his
+quest state rides on the `farm:<owner>` join reply as `npc`, and visitors get
+`null` so he never renders or prompts for them.
+
+- Stage `intro`: the first talk shows a one-time welcome. Dismissing it
+  (`Escape`, the close button, or "What do you need?") records `npcIntroSeen`
+  and advances to `tomatoes`; the window stays open and redraws as the tomato
+  order.
+- Stage `tomatoes`: he asks for ten tomatoes. The sell button enables when the
+  barn holds ten and pays `Crops.get("tomato").sell_value * 10`. The hand-in
+  removes ten from the barn, credits the wallet, and advances to `supplies`;
+  his thanks gets its own client-only screen (dismissed with Esc, ×, or "Got
+  it") before the lettuce/wheat menu appears.
+- Stage `supplies`: he wants ten lettuce and ten wheat, sold one batch at a
+  time, and sells repeatable ten-seed bundles at market price (40 GC lettuce,
+  20 GC wheat). Both hand-ins advance to `complete`.
+- Stage `complete`: he delivers the "meet me at the market" line and the
+  rectangle disappears. There is no marketplace cameo yet.
+
+Rules live in `Grange.NpcQuest` (server, authoritative) and `src/world/npcQuest.ts`
+(pure cards/offers/dialogue). Trades are channel events, not HTTP: the client
+never moves quest counters or barn counts itself. `FarmNpc` follows the live
+farmhouse prop position (`x + 145, y + 40`) and hides when the house is packed
+into the inventory. See `notes/npc-tutorial.md`.
 
 ---
 
@@ -916,6 +1009,14 @@ the client repaints it as grass.
   the scene-specific resource module) and to that scene's group in
   `worldAssets.ts`, or the image renders blank on the first visit.
 - Use `TILE_SIZE`/`MAP_*` constants; do not hard-code 64/1152/768.
+- The canvas fills the browser (`DisplayMode.FitContainerAndFill`), so the
+  visible world is wider than `MAP_WIDTH` on a widescreen. Outdoor scenes
+  reveal scenic terrain and keep the map centred; indoor rooms stay at the
+  original 1:1 camera zoom and show their own backdrop in the side gutters, so
+  walking and train animation speed match the pre-widescreen game. Camera
+  clamping goes through `cameraAxis()` in `src/world/viewport.ts`. Scenes
+  publish their live camera box as `data-view-*` attributes on the canvas
+  (`publishViewTransform`), and the e2e world-to-page helpers read them.
 - Use `BlockRegistry`, `walkCollisions`, and `sceneObstacles` instead of ad-hoc
   collision checks.
 - Preserve `data-world-ready="true"`, the canvas `aria-label`
@@ -1009,11 +1110,14 @@ reason (the repo already has one for a deliberate hook dependency).
   not pay for a farm → marketplace → casino walk. Valid areas are
   `farm-map`, `marketplace`, `casino`, `livestock-market`, `bank`
   (`requestedStartArea()` in `src/world/testMode.ts`).
-- The hooks are gated to dev/test: `PageController` injects
-  `<meta name="grange-test-routes" content="true">` only when
-  `enable_test_routes` is on (the same flag as `/api/reset`), and
-  `testMode.ts` reads it. Production never injects it, so `?area=` is ignored
-  and walking speed is normal.
+- The hooks are split into two dev-only tags. `PageController` injects
+  `<meta name="grange-test-routes" content="true">` whenever
+  `enable_test_routes` is on (the same flag as `/api/reset`), which enables
+  `?area=` deep links. A second `<meta name="grange-e2e" content="true">` is
+  injected only when the server also has `GRANGE_E2E=1` (set by
+  `playwright.config.ts`); `testMode.ts` gates `WALK_SPEED_MULTIPLIER` and
+  `e2eMs()` on that tag, so ordinary dev play keeps normal walking and
+  animation speed. Production injects neither tag.
 - `webServer.env` in `playwright.config.ts` runs the suite on a fast clock,
   all of it e2e-only:
   - `GRANGE_GROW_MS=100` → `Farm.grow_ms/0`: a crop ripens in 100ms, not 10s.
@@ -1074,12 +1178,14 @@ reason (the repo already has one for a deliberate hook dependency).
 - `pnpm test:e2e` runs `vite build` first. If you changed frontend code, do not
   run Playwright without rebuilding.
 - The suite runs `fullyParallel` with **2 workers by default**
-  (`workers: Number(process.env.E2E_WORKERS ?? 2)`); CI sets `E2E_WORKERS=3`
-  because the runner has 4 vCPUs. A faster local machine started at its own core
-  count just saturates the CPU and makes every walk slower than it is with two;
-  raise `E2E_WORKERS` to experiment. The per-test timeout is 90s (the longest
-  paths, like the casino, set their own larger budget; the heaviest farm specs
-  use `test.setTimeout(150_000)`).
+- The suite runs `fullyParallel` with **2 workers by default**
+  (`workers: Number(process.env.E2E_WORKERS ?? 2)`), and CI pins `E2E_WORKERS=1`.
+  The larger farm/marketplace scenes saturate the 4-vCPU runner; even two
+  workers drop clicks/keys in movement-heavy specs. A faster local machine
+  started at its own core count just saturates the CPU and makes every walk
+  slower than it is with one. The per-test timeout is 90s (the longest paths,
+  like the casino, set their own larger budget; the heaviest farm specs use
+  `test.setTimeout(150_000)`, and farm multiplayer uses 240_000).
 
 ### 10.4 CI
 
@@ -1091,7 +1197,7 @@ reason (the repo already has one for a deliberate hook dependency).
 4. Install Chromium.
 5. `pnpm check` (lint, Vitest, ExUnit, build).
 6. `pnpm test:e2e:run` (Playwright only). `pnpm check` already ran `pnpm build`,
-   so the e2e step must not rebuild; CI also sets `E2E_WORKERS=3`.
+   so the e2e step must not rebuild; CI also sets `E2E_WORKERS=1`.
 
 The required status check name is **`test`**; renaming the job silently
 removes the required check from the ruleset. There is also a `secrets` job that
@@ -1105,7 +1211,7 @@ runs Gitleaks.
 
 1. Add the id to `CropId` and a full entry to `CROPS` in `shared/crops.ts`
    (stage filenames, harvested sprite, seed id, costs, harvest tool, harvests,
-   regrow stage, synergy, mutation/bonus fields).
+   regrow stage, synergy, and any bonus fields).
 2. Add the matching stage list and entry to `@crops` in
    `backend/lib/grange/crops.ex`. Keep names, costs, tools, harvest counts, and
    synergy identical.
@@ -1236,12 +1342,11 @@ runs Gitleaks.
    hard-code 5.
 8. **`farms.tomatoes` is legacy.** Harvests write `barn_items`; `view.tomatoes`
    is derived from `barn["tomato"]`. Do not add new writes to the column.
-9. **Rare mutation seeds are server-rolled.** `FarmStore` persists drops in the
-   actor's inventory and returns them in the `farmAction` ack; the client only
-   displays them. Do not re-add a client-side roll.
-10. **The combo tracker is client-only.** The server receives only
-    `comboMutationMultiplier` (1 or 1.5) and maps it to combo count 15 for the
-    drop formula.
+9. **Rare crops come from catalysts.** Standard harvests no longer roll rare
+   seeds. `FarmCatalysts` consumes the owner's catalyst and transforms matching
+   tiles at dawn; old rare seed items remain plantable but drop nowhere.
+10. **The combo tracker is client-only.** No combo state is sent with farm
+    actions; the 15+ tier is currently cosmetic.
 11. **Passive watering / moisture retention is not modeled at all.** `Crops`
     exposes `passive_water` and the client registry exposes the decay
     multiplier, but `FarmStore` does not water neighbors on a tick and the
@@ -1262,8 +1367,10 @@ runs Gitleaks.
     `backend/priv/static/index.html`; `pnpm test:e2e` builds first.
 19. **`vite preview` intentionally mirrors the dev proxy.** Keep both proxy
     blocks in `vite.config.ts` in sync.
-20. **Admin inventory is client-side.** `is_admin` only triggers
-    `grantAllItems()` on sign-in. There is no server-side item authorization.
+20. **Admin inventory is client-side.** `is_admin` triggers `grantAllItems()` on
+    sign-in. The creative spawner's `/api/admin/item` endpoint also checks the
+    flag before persisting items to `player_items`; there is still no general
+    server-side item authorization for ordinary gameplay.
 21. **The server trusts balance deltas.** `POST /api/economy/transaction`
     accepts any integer delta from a logged-in user. Do not treat it as a
     secure economy authority.
@@ -1309,9 +1416,9 @@ runs Gitleaks.
 36. **Visibility and editing are different gates.** `is_public` only controls
     new joins; `visitor_edit` controls actions and is re-read per action.
     Turning a farm private never disconnects current visitors.
-37. **Visitor actions are actor-aware.** Seeds and mutation drops belong to the
-    acting user; harvested produce belongs to the farm owner. Do not collapse
-    actor and owner when adding a new action.
+37. **Visitor actions are actor-aware.** Seeds belong to the acting user;
+    harvested produce belongs to the farm owner. Do not collapse actor and
+    owner when adding a new action.
 38. **Never use Excalibur's `delta` for gameplay timing.** The engine clock
     rewrites any frame longer than 200ms to 1ms, so a starved browser plays in
     slow motion (a 2s train ride or a walk across the farm can take minutes).
@@ -1319,6 +1426,17 @@ runs Gitleaks.
     capped at 100ms and is identical to `delta` at normal frame rates. Take one
     step per `onPreUpdate` and pass it down; do not call `step()` twice in a
     frame.
+39. **The farmhand quest is server-authoritative and owner-only.** `NpcQuest`
+    moves counters and the barn in one transaction and credits the wallet; the
+    client only renders `npc` from the join reply/acks. Never mutate
+    `npcStore` locally beyond that mirror, and never show him to a visitor.
+40. **The release bundles ERTS and its NIFs, so the deploy runner's glibc must
+    not be newer than the hosts'.** Both deploy workflows pin
+    `runs-on: ubuntu-24.04` (glibc 2.38) because the hosts run Debian 13
+    (glibc 2.41). When `ubuntu-latest` moved to 26.04, the OTP build required
+    `GLIBC_2.43`, `beam.smp` refused to start, and every deploy failed its
+    health check while nginx served 502. Do not switch the deploy workflows
+    back to `ubuntu-latest`; pick the newest image the hosts can load.
 
 ---
 
@@ -1348,8 +1466,10 @@ them silently as part of an unrelated change; mention them in the PR.
 
 - Settings, whitelist management, and some market tabs (`tools`, `train`) are
   stubs.
-- Rare mutation seeds are persisted server-side, but Sun-Burst Tomato's extra
-  10% seed is declared and never rolled.
+- Sun-Burst Tomato's extra 10% bonus seed is declared in the registry, but
+  harvests no longer roll any rare/bonus seeds.
+- Rare-crop catalysts are dev/admin-only for now (no market or drop source);
+  admins get all three on lobby join and e2e uses the dev grant route.
 - Server-side passive watering for Frost-Crisp Lettuce is not implemented, and
   nothing else models it either (the old client-local simulation is gone).
 - Server growth calculation does not include lettuce moisture retention; the
@@ -1358,7 +1478,11 @@ them silently as part of an unrelated change; mention them in the PR.
   write-behind cache design is outdated.
 - `farms.tomatoes` remains for compatibility and is read by the dashboard and
   farm HUD.
-- `Farm.harvest_yield/0` is a dead constant.
+- `FARM_HARVEST_YIELD` and `Farm.harvest_yield/0` are dead constants.
+- The farmhand's quest is a starter tutorial with placeholder art (a brown
+  rectangle), no marketplace cameo, and no per-crop partial hand-ins. His
+  seed bundles are bought through `/api/inventory/buy`, so they share the
+  market's stock cap and server pricing.
 - `User.createdAt` in `shared/auth.ts` does not match the server payload.
 - The economy trusts client-supplied deltas; it is a game, not a ledger.
 - Casino games are entirely client-side; only the resulting wallet delta is
@@ -1387,6 +1511,7 @@ them silently as part of an unrelated change; mention them in the PR.
 - `notes/farming-mechanics.md` — crop/mechanic reference and asset mapping.
 - `notes/hub-multiplayer.md` — hub channel, presence, rendering, tuning.
 - `notes/farm-multiplayer.md` — farm settings, visitor rules, farm presence.
+- `notes/npc-tutorial.md` — farmhand quest stages, prices, and test hook.
 - `notes/change-policy.md` — branch/PR/review policy.
 - `notes/WireFrameLayout.md` — HUD/menu/inventory layout intent.
 - `notes/GameDesignNotes.md` — high-level game direction.

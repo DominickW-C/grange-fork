@@ -17,7 +17,14 @@ defmodule GrangeWeb.LobbyChannel do
   def join("lobby", _payload, socket) do
     GrangeWeb.Endpoint.subscribe("lobby")
     ensure_farm(socket)
-    {:ok, %{players: players(), farms: FarmStore.summaries(), items: items(socket)}, socket}
+
+    {:ok,
+     %{
+       players: players(),
+       farms: FarmStore.summaries(),
+       items: items(socket),
+       time: Grange.WorldClock.snapshot()
+     }, socket}
   end
 
   @impl true
@@ -73,8 +80,15 @@ defmodule GrangeWeb.LobbyChannel do
 
   defp items(socket) do
     case socket.assigns[:user] do
-      %{username: username} -> PlayerItems.map(username)
-      _ -> %{}
+      %{username: username, is_admin: true} ->
+        PlayerItems.grant_all_catalysts(username)
+        PlayerItems.map(username)
+
+      %{username: username} ->
+        PlayerItems.map(username)
+
+      _ ->
+        %{}
     end
   end
 

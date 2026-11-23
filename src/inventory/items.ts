@@ -1,15 +1,9 @@
-import type { CropId } from "../../shared/crops";
+import type { CatalystItemId, CropId } from "../../shared/crops";
 import type { FarmToolId } from "../../shared/farm";
-import {
-	FISH,
-	FISH_ORDER,
-	type FishId,
-	RODS,
-	ROD_ORDER,
-	type RodId,
-} from "../world/fishingData";
+import type { FishId, RodId } from "../world/fishingData";
 import type { MovablePropKey } from "../world/mapData";
 import type { AnimalId } from "../world/livestockData";
+import { CATALYST_ITEMS, FISH_ITEMS, ROD_ITEMS } from "./specialItems";
 
 export type ItemId =
 	| "hoe"
@@ -22,6 +16,7 @@ export type ItemId =
 	| "midas_wheat"
 	| "frost_lettuce"
 	| "sunburst_tomato"
+	| CatalystItemId
 	| "wheat-seed"
 	| "lettuce-seed"
 	| "midas-wheat-seed"
@@ -36,7 +31,14 @@ export type ItemId =
 	| FishId
 	| MovablePropKey;
 
-export type ItemKind = "tool" | "seed" | "crop" | "fish" | "building" | "animal";
+export type ItemKind =
+	| "tool"
+	| "seed"
+	| "crop"
+	| "fish"
+	| "building"
+	| "animal"
+	| "catalyst";
 
 export interface ItemDef {
 	id: ItemId;
@@ -48,37 +50,10 @@ export interface ItemDef {
 	description: string;
 }
 
-/** Fishing rods are single-stack tools; their icon and blurb come from RODS. */
-function rodItem(id: RodId): ItemDef {
-	return {
-		id,
-		name: RODS[id].name,
-		kind: "tool",
-		maxStack: 1,
-		icon: RODS[id].icon,
-		description: RODS[id].blurb,
-	};
-}
-
-/** Caught fish are stackable inventory items; their emoji stands in for art. */
-function fishItem(id: FishId): ItemDef {
-	return {
-		id,
-		name: FISH[id].name,
-		kind: "fish",
-		maxStack: 99,
-		icon: FISH[id].emoji,
-		description: FISH[id].blurb,
-	};
-}
-
 export const ITEMS: Record<ItemId, ItemDef> = {
-	...(Object.fromEntries(
-		ROD_ORDER.map((id) => [id, rodItem(id)]),
-	) as Record<RodId, ItemDef>),
-	...(Object.fromEntries(
-		FISH_ORDER.map((id) => [id, fishItem(id)]),
-	) as Record<FishId, ItemDef>),
+	...ROD_ITEMS,
+	...FISH_ITEMS,
+	...CATALYST_ITEMS,
 	hoe: {
 		id: "hoe",
 		name: "Hoe",
@@ -202,7 +177,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 	fence: {
 		id: "fence", name: "Fence", kind: "building", maxStack: 99,
 		icon: "/assets/farm/fences/post.webp",
-		description: "Click grass to place a fence post. Adjacent posts connect automatically.",
+		description: "Place posts on tile corners; neighboring posts connect along tile edges.",
 	},
 	gate: {
 		id: "gate",
@@ -210,7 +185,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 		kind: "building",
 		maxStack: 99,
 		icon: "/assets/farm/fences/gate-closed-horizontal.webp",
-		description: "Click grass to place a gate. Walk up and press E to open it.",
+		description: "Place on a tile corner. Walk up and press E to open it.",
 	},
 	shovel: {
 		id: "shovel", name: "Shovel", kind: "tool", maxStack: 1,
@@ -227,16 +202,16 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 	},
 	cow: { id: "cow", name: "Cow", kind: "animal", maxStack: 99,
 		icon: "/assets/farm/animals/cow/idle-01.webp",
-		description: "A cow bought at the livestock market. Farm placement is coming later." },
+		description: "Place on clear farm ground or inside a pen; use a shovel to pick it up." },
 	hen: { id: "hen", name: "Hen", kind: "animal", maxStack: 99,
 		icon: "/assets/farm/animals/hen/idle-01.webp",
-		description: "A hen bought at the livestock market. Farm placement is coming later." },
+		description: "Place on clear farm ground or inside a pen; use a shovel to pick it up." },
 	sheep: { id: "sheep", name: "Sheep", kind: "animal", maxStack: 99,
 		icon: "/assets/farm/animals/sheep/idle-01.webp",
-		description: "A sheep bought at the livestock market. Farm placement is coming later." },
+		description: "Place on clear farm ground or inside a pen; use a shovel to pick it up." },
 	pig: { id: "pig", name: "Pig", kind: "animal", maxStack: 99,
 		icon: "/assets/farm/animals/pig/idle-01.webp",
-		description: "A pig bought at the livestock market. Farm placement is coming later." },
+		description: "Place on clear farm ground or inside a pen; use a shovel to pick it up." },
 	farmhouse: { id: "farmhouse", name: "Farmhouse", kind: "building", maxStack: 99,
 		icon: "/assets/farm/buildings/farmhouse.webp", description: "Place your farmhouse on clear ground." },
 	barn: { id: "barn", name: "Barn", kind: "building", maxStack: 99,

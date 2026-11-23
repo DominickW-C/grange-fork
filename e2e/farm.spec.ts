@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TILE_SIZE } from "../src/world/mapData";
 import {
 	clickFarmTile,
 	clickWorld,
@@ -9,6 +10,7 @@ import {
 	registerFast,
 	tapFarmTile,
 	uniqueName,
+	waitForWorld,
 	walkUntilPrompt,
 	worldPoint,
 } from "./helpers";
@@ -28,13 +30,16 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	// Hoe tile (9, 7)
 	await clickFarmTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
+	// The first click walks into tool range on newer builds. Reuse that position
+	// for the rest of this tile's farming cycle instead of walking on every step.
+	const workTile = () => clickWorld(page, 9.5 * TILE_SIZE, 7.5 * TILE_SIZE);
 
 	// Seeds (hotbar slot 2 maps to key "2")
 	await page.keyboard.press("2");
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveClass(
 		/inv-slot-selected/,
 	);
-	await clickFarmTile(page, 9, 7);
+	await workTile();
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): planted");
 	// Planting spends one tomato seed from the pouch (10 -> 9).
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
@@ -45,7 +50,7 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	// Bucket. The e2e clock can ripen the tile before this assertion runs, and
 	// `ready` also proves the watering landed.
 	await page.keyboard.press("3");
-	await clickFarmTile(page, 9, 7);
+	await workTile();
 	await expect(page.getByTestId("farm-tile")).toContainText(
 		/\(9, 7\): (?:watered|ready)/,
 	);
@@ -55,7 +60,7 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 		timeout: 20_000,
 	});
 	await page.keyboard.press("4");
-	await clickFarmTile(page, 9, 7);
+	await workTile();
 	// The harvested tomato lands in the first free inventory slot after the tools.
 	await expect(page.locator('[data-item="tomato"]')).toHaveAttribute(
 		"data-count",
@@ -111,7 +116,7 @@ test("hoe click tills an open grass square", async ({ page }) => {
 	await expect(tiles).toHaveText("1 tiles");
 });
 
-test("a fence places, blocks hoeing, and returns to inventory when shoveled", async ({
+test("a fence leaves its neighboring tile farmable and returns to inventory when shoveled", async ({
 	page,
 }) => {
 	await registerFast(page, uniqueName("Sprout"));
@@ -126,18 +131,13 @@ test("a fence places, blocks hoeing, and returns to inventory when shoveled", as
 	);
 	await page.keyboard.press("1");
 	await clickFarmTile(page, 7, 5);
-	await expect(page.getByTestId("notification-feed")).toContainText(
-		"Something is in the way.",
-	);
-	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): grass");
+	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): tilled");
 	await page.keyboard.press("7");
 	await clickFarmTile(page, 7, 5);
 	await expect(page.getByTestId("slot-hotbar-5")).toHaveAttribute(
 		"data-count",
 		"20",
 	);
-	await page.keyboard.press("1");
-	await clickFarmTile(page, 7, 5);
 	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): tilled");
 });
 
@@ -149,23 +149,67 @@ test("a gate places, opens with E, and returns to inventory when shoveled", asyn
 	await expect(page.getByTestId("notification-feed")).toBeVisible();
 
 	await page.keyboard.press("5");
-	await clickFarmTile(page, 8, 8);
+	// Gates snap to tile corners. Pick (9, 9), 44px from the player spawn,
+	// instead of a tile center that may round to a farther corner.
+	const gatePoint = { x: 9 * TILE_SIZE + 4, y: 9 * TILE_SIZE + 4 };
+	await clickWorld(page, gatePoint.x, gatePoint.y);
 	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
 		"data-count",
 		"1",
 	);
 
-	// The player spawns within reach of this gate, so its prompt appears at once.
+	// The player spawns within reach of this corner, so its prompt appears at once.
 	await expect(page.getByTestId("travel-prompt")).toContainText("open gate");
 	await page.keyboard.press("e");
 	await expect(page.getByTestId("travel-prompt")).toContainText("close gate");
 
 	await page.keyboard.press("7");
-	await clickFarmTile(page, 8, 8);
+	await clickWorld(page, gatePoint.x, gatePoint.y);
 	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
 		"data-count",
 		"2",
 	);
+});
+
+test("the last gate leaves the hotbar instead of a zero-count phantom", async ({
+	page,
+}) => {
+	await registerFast(page, uniqueName("GateOut"));
+	const gateSlot = page.getByTestId("hotbar").getByTestId("slot-hotbar-4");
+	await expect(gateSlot).toHaveAttribute("data-count", "2");
+
+	await page.keyboard.press("5");
+	await clickWorld(page, 9 * TILE_SIZE + 4, 9 * TILE_SIZE + 4);
+	await expect(gateSlot).toHaveAttribute("data-count", "1");
+
+	// The second and last gate empties the stack: an icon with no count would
+	// read as "one gate left" and then refuse placement.
+	await clickWorld(page, 8 * TILE_SIZE + 4, 9 * TILE_SIZE + 4);
+	await expect(gateSlot).toHaveAttribute("data-count", "0");
+	await expect(gateSlot).toHaveAttribute("data-item", "");
+});
+
+test("a fence reaches the southern world border under the HUD", async ({
+	page,
+}) => {
+	test.setTimeout(150_000);
+	await registerFast(page, uniqueName("BorderFence"));
+	await page.request.post("/api/economy/transaction", {
+		data: { delta: 10_000 },
+	});
+	for (let level = 1; level <= 5; level += 1) {
+		await page.request.post("/api/land/buy", { data: {} });
+	}
+	await page.reload();
+	await waitForWorld(page);
+
+	// Stand on the shore near the middle of the map. The (12, 10) post is the
+	// world border, and its click point falls under the bottom-center HUD.
+	await movePlayerNear(page, 800, 660, 24, { reach: 24, timeout: 30_000 });
+	await page.keyboard.press("6");
+	await clickWorld(page, 12 * TILE_SIZE, 10 * TILE_SIZE);
+	await expect(page.getByTestId("hotbar").getByTestId("slot-hotbar-5"))
+		.toHaveAttribute("data-count", "19");
 });
 
 test("fence placement previews on hold and commits only on a valid release", async ({

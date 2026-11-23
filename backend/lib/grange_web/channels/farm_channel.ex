@@ -13,7 +13,19 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
-  alias Grange.{BarnStorage, FarmGateActions, FarmSettings, FarmStore, Inventory, WorldPosition}
+  alias Grange.{
+    BarnStorage,
+    FarmGateActions,
+    FarmPresence,
+    FarmSettings,
+    FarmStore,
+    Inventory,
+    NpcQuest,
+    PlayerItems,
+    SleepVotes,
+    WorldPosition
+  }
+
   alias GrangeWeb.Presence
 
   # A client sends at ~10 Hz; this only guards against abusive or buggy loops.
@@ -44,9 +56,12 @@ defmodule GrangeWeb.FarmChannel do
 
       true ->
         GrangeWeb.Endpoint.subscribe("farm:" <> owner)
+        FarmPresence.join(owner, username)
         track(username, owner, nil, nil)
         send(self(), :after_join)
-        {:ok, %{farm: FarmStore.view(owner)}, assign(socket, :owner, owner)}
+
+        {:ok, %{farm: FarmStore.view(owner), npc: npc_status(owner, username)},
+         assign(socket, :owner, owner)}
     end
   end
 
@@ -58,7 +73,11 @@ defmodule GrangeWeb.FarmChannel do
 
   @impl true
   def handle_in("farmAction", %{"action" => action}, socket) do
-    authorize_edit(socket, fn owner, actor -> act(socket, owner, actor, action) end)
+    if is_map(action) and action["kind"] in ["place_animal", "remove_animal"] do
+      authorize_owner(socket, fn owner -> act(socket, owner, owner, action) end)
+    else
+      authorize_edit(socket, fn owner, actor -> act(socket, owner, actor, action) end)
+    end
   end
 
   @impl true
@@ -72,6 +91,33 @@ defmodule GrangeWeb.FarmChannel do
   @impl true
   def handle_in("sellProduce", %{"item" => item, "count" => count}, socket) do
     authorize_owner(socket, fn owner -> sell(socket, owner, item, count) end)
+  end
+
+  @impl true
+  def handle_in("useCatalyst", %{"item" => item}, socket) when is_binary(item) do
+    authorize_owner(socket, fn owner -> use_catalyst(socket, owner, item) end)
+  end
+
+  def handle_in("useCatalyst", _payload, socket) do
+    {:reply, {:error, %{error: "invalid catalyst"}}, socket}
+  end
+
+  # The farmhand's quest is owner-only: he stands on the owner's farm and
+  # trades from the owner's barn and wallet.
+  @impl true
+  def handle_in("npcIntroSeen", _payload, socket) do
+    authorize_owner(socket, fn owner ->
+      {:reply, {:ok, %{npc: NpcQuest.intro_seen(owner)}}, socket}
+    end)
+  end
+
+  @impl true
+  def handle_in("npcSell", %{"item" => item}, socket) do
+    authorize_owner(socket, fn owner -> sell_to_npc(socket, owner, item) end)
+  end
+
+  def handle_in("npcSell", _payload, socket) do
+    {:reply, {:error, %{error: "invalid trade"}}, socket}
   end
 
   @impl true
@@ -102,7 +148,7 @@ defmodule GrangeWeb.FarmChannel do
     with %{username: username} <- user,
          true <- is_binary(owner),
          true <- throttle_open?(socket.assigns[:last_move_at], now),
-         {:ok, {px, py}} <- WorldPosition.clamp(x, y) do
+         {:ok, {px, py}} <- WorldPosition.clamp_farm(x, y) do
       track(username, owner, px, py)
       {:reply, :ok, assign(socket, :last_move_at, now)}
     else
@@ -139,6 +185,33 @@ defmodule GrangeWeb.FarmChannel do
   end
 
   @impl true
+  def handle_in("sleep", _payload, socket) do
+    with_user(socket, fn owner, username ->
+      case SleepVotes.request(owner, username) do
+        {:ok, result} -> {:reply, {:ok, %{result: result}}, socket}
+        {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+      end
+    end)
+  end
+
+  @impl true
+  def handle_in("sleepVote", %{"decision" => decision}, socket)
+      when decision in ["accept", "decline"] do
+    with_user(socket, fn owner, username ->
+      action = if decision == "accept", do: :accept, else: :decline
+
+      case SleepVotes.vote(owner, username, action) do
+        {:ok, _result} -> {:reply, :ok, socket}
+        {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+      end
+    end)
+  end
+
+  def handle_in("sleepVote", _payload, socket) do
+    {:reply, {:error, %{error: "invalid vote"}}, socket}
+  end
+
+  @impl true
   def handle_out(event, payload, socket) do
     push(socket, event, payload)
     {:noreply, socket}
@@ -169,6 +242,15 @@ defmodule GrangeWeb.FarmChannel do
     end
   end
 
+  defp with_user(socket, handler) do
+    with %{username: username} <- socket.assigns[:user],
+         owner when is_binary(owner) <- socket.assigns[:owner] do
+      handler.(owner, username)
+    else
+      _ -> {:reply, {:error, %{error: "not logged in"}}, socket}
+    end
+  end
+
   # Props are normally the owner's (or an enabled visitor's), but admins may
   # rearrange buildings on any farm.
   defp authorize_prop(socket, handler) do
@@ -186,9 +268,8 @@ defmodule GrangeWeb.FarmChannel do
 
   defp act(socket, owner, actor, action) do
     case FarmStore.action(owner, action, actor) do
-      {:ok, farm} ->
-        reply = %{seeds: Inventory.seeds(actor), drops: Map.get(farm, :drops, [])}
-        {:reply, {:ok, reply}, socket}
+      {:ok, _farm} ->
+        {:reply, {:ok, %{seeds: Inventory.seeds(actor)}}, socket}
 
       {:error, reason} ->
         reply = %{error: reason, seeds: Inventory.seeds(actor)}
@@ -216,6 +297,31 @@ defmodule GrangeWeb.FarmChannel do
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
     end
   end
+
+  defp use_catalyst(socket, owner, item) do
+    case FarmStore.use_catalyst(owner, item) do
+      {:ok, pending} ->
+        {:reply, {:ok, %{pending: pending, items: PlayerItems.map(owner)}}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{error: reason, items: PlayerItems.map(owner)}}, socket}
+    end
+  end
+
+  defp sell_to_npc(socket, owner, item) do
+    case NpcQuest.sell(owner, item) do
+      {:ok, result} ->
+        # The trade removes produce from the barn, so refresh the room.
+        FarmStore.refresh(owner)
+        {:reply, {:ok, result}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
+  defp npc_status(owner, username) when owner == username, do: NpcQuest.status(owner)
+  defp npc_status(_owner, _username), do: nil
 
   defp barn_act(socket, owner, action) do
     with {:ok, :ok} <- BarnStorage.action(owner, action),

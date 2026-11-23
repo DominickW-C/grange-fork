@@ -298,8 +298,8 @@ defmodule Grange.Accounts do
   # A password, when given, is rehashed and stored so the login is known.
   defp promote(user, password) do
     balance = max(user.balance, @admin_balance)
-    # Admins are minted from the CLI, which has no mailbox to confirm an
-    # address from, so promotion also marks the account usable.
+    # An operator is the one running this, so the promoted login must be usable
+    # even though the account never confirmed its email.
     verified_at = user.email_verified_at || DateTime.utc_now()
 
     changes =

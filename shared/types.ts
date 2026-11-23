@@ -1,5 +1,6 @@
 import type { CropId } from "./crops";
 import type { FarmTileState } from "./farm";
+import type { DayPhase, WorldTime } from "./mechanics";
 
 /** A registered account as sent over the wire (no password hash). */
 export interface Player {
@@ -54,6 +55,13 @@ export interface ActiveFarm {
 	barn: Record<string, number>;
 	/** Livestock owned by this farm, keyed by animal species. */
 	animals: Record<string, number>;
+	/** Individual animals placed on the map; `animals` counts only carried ones. */
+	placed_animals?: Array<{
+		id: number;
+		species: "cow" | "hen" | "sheep" | "pig";
+		x: number;
+		y: number;
+	}>;
 	land_level?: number;
 	/** Whether strangers may join this farm. */
 	is_public: boolean;
@@ -73,12 +81,46 @@ export interface ActiveFarm {
 		carried: boolean;
 	}>;
 	prop_inventory: Record<string, number>;
+	/** Items stored in the barn's storage container. */
 	storage: Record<string, number>;
+	/** The shared day/night clock snapshot, attached to every farm view. */
+	time?: WorldTime;
+	/** Convenience top-level mirrors of `time`, for simple UI checks. */
+	cycle_time_ms?: number;
+	day_phase?: DayPhase;
+}
+
+/** A farm-wide sleep vote prompt pushed while the clock is at night. */
+export interface SleepVote {
+	initiator: string;
+	required: string[];
+	accepted: string[];
+	declined: string[];
+}
+
+export type SleepVoteResult = "accepted" | "declined" | "expired" | "skipped";
+
+/** The outcome of a sleep vote, broadcast to everyone on the farm. */
+export interface SleepVoteResultPayload {
+	result: SleepVoteResult;
+	initiator: string;
 }
 
 export type FarmPropAction =
 	| { kind: "dig"; index: number }
 	| { kind: "place"; asset: string; x: number; y: number };
+
+/** Where the farmhand's starter quest stands. */
+export type NpcStage = "intro" | "tomatoes" | "supplies" | "complete";
+
+/** The owner's farmhand quest progress, sent with the farm join reply. */
+export interface NpcQuestStatus {
+	stage: NpcStage;
+	/** Crops handed in so far, each capped at the quest goal. */
+	tomatoes: number;
+	lettuce: number;
+	wheat: number;
+}
 
 /** A deposit into or withdrawal from a farm's barn storage. */
 export interface BarnAction {
@@ -117,12 +159,16 @@ export type FarmAction = {
 		| "remove_fence"
 		| "place_gate"
 		| "remove_gate"
+		| "place_animal"
+		| "remove_animal"
 		| "place_sprinkler"
 		| "remove_sprinkler";
 	x: number;
 	y: number;
 	/** Seed crop to plant (kind === "plant"). */
 	crop?: CropId;
+	/** Species to place from the farm's unplaced-animal inventory. */
+	animal?: "cow" | "hen" | "sheep" | "pig";
 	/** Harvest tool in hand, so the server can enforce scythe-only crops. */
 	tool?: "hand" | "scythe";
 	/** Combo mutation multiplier carried on a harvest for the rare-seed roll. */

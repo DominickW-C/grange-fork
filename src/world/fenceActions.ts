@@ -3,26 +3,43 @@ import { useInventoryStore } from "../inventory/inventoryStore";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
 import type { BlockRegistry } from "./blocking";
-import { fenceInBounds, fenceKey } from "./fenceData";
-import { isTillableTile, ownsFarmTile, TILE_SIZE } from "./mapData";
+import { fenceKey, ownsFenceCorner } from "./fenceData";
+import { TILE_SIZE } from "./mapData";
 
 export function selectedFarmItem() {
 	const inventory = useInventoryStore.getState();
 	return inventory.hotbar[inventory.selectedHotbar]?.itemId ?? null;
 }
 
+/** True when a post already stands on this corner or the player is on it. */
+function fenceCornerOccupied(farm: ActiveFarm, column: number, row: number,
+	player: { x: number; y: number }): boolean {
+	const key = fenceKey(column, row);
+	return (farm.fences ?? []).some(({ x, y }) => fenceKey(x, y) === key) ||
+		(farm.gates ?? []).some(({ x, y }) => fenceKey(x, y) === key) ||
+		Math.hypot(player.x - column * TILE_SIZE, player.y - row * TILE_SIZE) < 16;
+}
+
 export function fencePlacementReason(farm: ActiveFarm,
-	column: number, row: number, blocks: BlockRegistry,
+	column: number, row: number, _blocks: BlockRegistry,
 	player: { x: number; y: number }): string | null {
-	if (!fenceInBounds(column, row)) return "Keep fences on dry land.";
-	if (!ownsFarmTile(column, row, farm.land_level ?? 0)) return "Buy this land from the mayor first.";
+	if (!ownsFenceCorner(column, row, farm.land_level ?? 0))
+		return "Buy this land from the mayor first.";
 	if (farm.fence_count <= 0) return "No fences left in inventory.";
-	if (blocks.isBlocked(column, row) ||
-		(farm.fences ?? []).some(({ x, y }) => fenceKey(x, y) === fenceKey(column, row)) ||
-		(farm.gates ?? []).some(({ x, y }) => fenceKey(x, y) === fenceKey(column, row)) ||
-		farm.tiles.some((tile) => tile.x === column && tile.y === row) ||
-		(column === Math.floor(player.x / TILE_SIZE) && row === Math.floor(player.y / TILE_SIZE)))
-		return "That tile is occupied.";
+	if (fenceCornerOccupied(farm, column, row, player))
+		return "That fence corner is occupied.";
+	return null;
+}
+
+/** A gate shares the fence corner rules but reports its own supply message. */
+export function gatePlacementReason(farm: ActiveFarm,
+	column: number, row: number,
+	player: { x: number; y: number }): string | null {
+	if (!ownsFenceCorner(column, row, farm.land_level ?? 0))
+		return "Buy this land from the mayor first.";
+	if (farm.gate_count <= 0) return "No gates left in inventory.";
+	if (fenceCornerOccupied(farm, column, row, player))
+		return "That gate corner is occupied.";
 	return null;
 }
 
@@ -41,14 +58,8 @@ export function actOnFence(owner: string, column: number, row: number,
 		if (reason) { report(reason); return; }
 	}
 	if (item === "gate") {
-		if (!fenceInBounds(column, row) || !isTillableTile(column, row) ||
-			!ownsFarmTile(column, row, farm.land_level ?? 0) ||
-			blocks.isBlocked(column, row) || fenceHere || gateHere || farm.gate_count <= 0 ||
-			(column === Math.floor(player.x / TILE_SIZE) && row === Math.floor(player.y / TILE_SIZE)) ||
-			farm.tiles.some((tile) => tile.x === column && tile.y === row)) {
-			report("Place gates on clear grass.");
-			return;
-		}
+		const reason = gatePlacementReason(farm, column, row, player);
+		if (reason) { report(reason); return; }
 	}
 
 	if (item === "shovel" && !fenceHere && !gateHere) {

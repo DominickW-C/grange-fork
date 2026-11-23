@@ -1,7 +1,7 @@
 /**
- * Tuning for the arcade farming layer: the combo tracker, grid synergy growth
- * modifiers, and rare-mutation seed drops. Kept apart from the crop registry so
- * balance changes read as one list.
+ * Tuning for the arcade farming layer: the combo tracker and grid synergy
+ * growth modifiers. Kept apart from the crop registry so balance changes read
+ * as one list.
  */
 
 /** Combo expires this long after the last valid action. */
@@ -17,11 +17,6 @@ export const COMBO_SPREAD_TIER = 10;
 export const COMBO_SPREAD_CHANCE = 0.15;
 export const COMBO_MUTATION_TIER = 15;
 export const COMBO_MUTATION_MULTIPLIER = 1.5;
-
-/** Base rare-mutation drop chance on a mature standard-crop harvest. */
-export const MUTATION_BASE_CHANCE = 0.0015;
-/** Added when the harvested crop has its positive neighbour synergy active. */
-export const MUTATION_SYNERGY_BONUS = 0.0025;
 
 /** Wheat "pack mentality": +5% growth speed per adjacent wheat, capped at +20%. */
 export const WHEAT_PACK_PER_NEIGHBOR = 0.05;
@@ -59,18 +54,6 @@ export function comboMutationMultiplier(comboCount: number): number {
 	return comboTier(comboCount) === "mutation" ? COMBO_MUTATION_MULTIPLIER : 1;
 }
 
-/**
- * Rare seed drop chance for a mature standard harvest. Synergy and combo are
- * the only modifiers, capping at (base + synergy) * 1.5 = 0.6%.
- */
-export function mutationChance(
-	comboCount: number,
-	synergyActive: boolean,
-): number {
-	const bonus = synergyActive ? MUTATION_SYNERGY_BONUS : 0;
-	return (MUTATION_BASE_CHANCE + bonus) * comboMutationMultiplier(comboCount);
-}
-
 /** Effects of a combo bonus applied outward from a tile action. */
 export interface ComboPerks {
 	moveSpeed: number;
@@ -86,4 +69,50 @@ export function comboPerks(comboCount: number): ComboPerks {
 		spreadChance: comboSpreadChance(comboCount),
 		mutationMultiplier: comboMutationMultiplier(comboCount),
 	};
+}
+
+/**
+ * The global day/night clock. A full cycle is 36 real-world minutes: 24 of day
+ * and 12 of night. The server is authoritative; clients extrapolate between
+ * syncs so lighting stays smooth.
+ */
+export const DAY_PHASE_MS = 24 * 60 * 1000;
+export const NIGHT_PHASE_MS = 12 * 60 * 1000;
+export const DAY_NIGHT_CYCLE_MS = DAY_PHASE_MS + NIGHT_PHASE_MS;
+
+export type DayPhase = "day" | "night";
+
+/** The clock snapshot broadcast by the server and attached to farm views. */
+export interface WorldTime {
+	cycle_time_ms: number;
+	cycle_length_ms: number;
+	day_length_ms: number;
+	night_length_ms: number;
+	phase: DayPhase;
+	server_time_ms: number;
+}
+
+/** Wraps any cycle time into `[0, DAY_NIGHT_CYCLE_MS)`. */
+export function normalizeCycleTime(cycleTimeMs: number): number {
+	const cycle = DAY_NIGHT_CYCLE_MS;
+	return ((cycleTimeMs % cycle) + cycle) % cycle;
+}
+
+export function dayPhaseFor(cycleTimeMs: number): DayPhase {
+	return normalizeCycleTime(cycleTimeMs) < DAY_PHASE_MS ? "day" : "night";
+}
+
+/** Extrapolate the server clock to a client-side wall-clock time. */
+export function cycleTimeNow(
+	time: WorldTime,
+	nowMs: number = Date.now(),
+): number {
+	return normalizeCycleTime(time.cycle_time_ms + (nowMs - time.server_time_ms));
+}
+
+export function dayPhaseNow(
+	time: WorldTime,
+	nowMs: number = Date.now(),
+): DayPhase {
+	return dayPhaseFor(cycleTimeNow(time, nowMs));
 }
