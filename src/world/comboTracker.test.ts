@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	COMBO_SWAP_GRACE_MS,
-	COMBO_WINDOW_MS,
-} from "../../shared/mechanics";
+import { COMBO_SWAP_GRACE_MS, COMBO_WINDOW_MS } from "../../shared/mechanics";
 import { ComboTracker } from "./comboTracker";
 
 describe("ComboTracker", () => {

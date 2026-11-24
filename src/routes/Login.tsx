@@ -43,9 +43,7 @@ export default function Login() {
 				if (res.ok) {
 					// No session yet: the account is locked until the emailed link
 					// is opened, so stay on this screen and explain what happens next.
-					setNotice(
-						res.message ?? "Check your email to verify your account.",
-					);
+					setNotice(res.message ?? "Check your email to verify your account.");
 				} else {
 					setError(res.error ?? "Something went wrong");
 				}
@@ -139,7 +137,10 @@ export default function Login() {
 					</button>
 
 					{error && (
-						<p data-testid="auth-error" className="text-center text-sm text-pumpkin">
+						<p
+							data-testid="auth-error"
+							className="text-center text-sm text-pumpkin"
+						>
 							{error}
 						</p>
 					)}
@@ -156,7 +157,10 @@ export default function Login() {
 					)}
 
 					{mode === "signup" && notice && (
-						<p data-testid="auth-notice" className="text-center text-sm text-leaf">
+						<p
+							data-testid="auth-notice"
+							className="text-center text-sm text-leaf"
+						>
 							{notice}
 						</p>
 					)}

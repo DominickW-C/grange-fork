@@ -2,7 +2,10 @@ import type * as ex from "excalibur";
 import { bankResources } from "./bankResources";
 import { casinoResources } from "./casinoResources";
 import { farmerImage } from "./farmerSprite";
-import { animalAnimationResources, livestockResources } from "./livestockResources";
+import {
+	animalAnimationResources,
+	livestockResources,
+} from "./livestockResources";
 import { marketplaceResources } from "./marketplaceResources";
 import {
 	resources,
@@ -27,7 +30,11 @@ function unique(groups: ex.ImageSource[][]): ex.ImageSource[] {
  * versa. Scenes now load only what they draw, and the rest stream in behind the
  * first frame (see `preloadWorldResources`).
  */
-const farmAssets = unique([resources, sprinklerResources, animalAnimationResources]);
+const farmAssets = unique([
+	resources,
+	sprinklerResources,
+	animalAnimationResources,
+]);
 
 /** The shared player sprite every scene draws. */
 const avatarAssets = [farmerImage];

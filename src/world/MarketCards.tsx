@@ -147,10 +147,7 @@ export function GenericCategoryGrid({
 							)}
 							<span className="market-card-name">{item.name}</span>
 							<span className="market-card-price">{item.blurb}</span>
-							<span
-								className="market-stock"
-								data-testid={`market-owned-${id}`}
-							>
+							<span className="market-stock" data-testid={`market-owned-${id}`}>
 								Owned: {control.owned}
 							</span>
 							<button

@@ -40,9 +40,9 @@ describe("withinBarnReach", () => {
 		expect(withinBarnReach({ x: 380 - BARN_REACH - 1, y: 380 }, barn)).toBe(
 			false,
 		);
-		expect(withinBarnReach({ x: 500, y: 400 - 160 - BARN_REACH - 1 }, barn)).toBe(
-			false,
-		);
+		expect(
+			withinBarnReach({ x: 500, y: 400 - 160 - BARN_REACH - 1 }, barn),
+		).toBe(false);
 	});
 
 	it("honours a custom margin", () => {

@@ -39,8 +39,7 @@ export const MARKETPLACE_COLUMNS =
 	MARKETPLACE_MAX_COLUMN - MARKETPLACE_MIN_COLUMN + 1;
 export const MARKETPLACE_MIN_ROW = -8;
 export const MARKETPLACE_MAX_ROW = 11;
-export const MARKETPLACE_ROWS =
-	MARKETPLACE_MAX_ROW - MARKETPLACE_MIN_ROW + 1;
+export const MARKETPLACE_ROWS = MARKETPLACE_MAX_ROW - MARKETPLACE_MIN_ROW + 1;
 /** Right edge and top edge of the walkable marketplace, in world pixels. */
 export const MARKETPLACE_WIDTH = (MARKETPLACE_MAX_COLUMN + 1) * 64;
 export const MARKETPLACE_HEIGHT = (MARKETPLACE_MAX_ROW + 1) * 64;

@@ -23,7 +23,13 @@ interface Props {
 	onReceiveBarn?: (payload: BarnDragPayload) => void;
 }
 
-export function InventorySlot({ area, index, selected, keyHint, onReceiveBarn }: Props) {
+export function InventorySlot({
+	area,
+	index,
+	selected,
+	keyHint,
+	onReceiveBarn,
+}: Props) {
 	const slot = useInventoryStore((s) =>
 		area === "grid" ? s.grid[index] : s.hotbar[index],
 	);

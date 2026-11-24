@@ -31,7 +31,10 @@ export class LivestockMarketScene extends WalkingScene {
 				{
 					position: ex.vec(LIVESTOCK_EXIT.x, LIVESTOCK_EXIT.y),
 					destination: "marketplace",
-					destinationSpawn: { x: MARKETPLACE_LIVESTOCK_ENTRANCE.x, y: MARKETPLACE_LIVESTOCK_ENTRANCE.y + 48 },
+					destinationSpawn: {
+						x: MARKETPLACE_LIVESTOCK_ENTRANCE.x,
+						y: MARKETPLACE_LIVESTOCK_ENTRANCE.y + 48,
+					},
 					prompt: "Press E to leave the livestock market",
 					radius: 54,
 				},
@@ -49,7 +52,13 @@ export class LivestockMarketScene extends WalkingScene {
 
 	override onInitialize(): void {
 		this.backgroundColor = ex.Color.fromHex("#342317");
-		this.addImage(livestockInteriorImage, MAP_WIDTH / 2, MAP_HEIGHT, MAP_WIDTH, 0);
+		this.addImage(
+			livestockInteriorImage,
+			MAP_WIDTH / 2,
+			MAP_HEIGHT,
+			MAP_WIDTH,
+			0,
+		);
 		for (const pen of livestockPens) this.addPen(pen);
 		this.addPlayer();
 	}
@@ -57,7 +66,13 @@ export class LivestockMarketScene extends WalkingScene {
 	private addPen(pen: (typeof livestockPens)[number]): void {
 		// Draw the animal above the pen/fence (z 30) so the fence never covers
 		// its head, but below the sign (z 40).
-		this.addImage(livestockAnimalImages[pen.id], pen.x, pen.y - 76, pen.animalWidth, 35);
+		this.addImage(
+			livestockAnimalImages[pen.id],
+			pen.x,
+			pen.y - 76,
+			pen.animalWidth,
+			35,
+		);
 		this.addImage(livestockTroughImage, pen.x + 88, pen.y - 56, 62, 12);
 		this.addImage(livestockPenImage, pen.x, pen.y, pen.width, 30);
 		const signX = pen.x < MAP_WIDTH / 2 ? pen.x + 160 : pen.x - 160;
@@ -74,7 +89,11 @@ export class LivestockMarketScene extends WalkingScene {
 		const sprite = source.toSprite();
 		const scale = width / source.width;
 		sprite.scale = ex.vec(scale, scale);
-		const actor = new ex.Actor({ pos: ex.vec(x, y), anchor: ex.vec(0.5, 1), z });
+		const actor = new ex.Actor({
+			pos: ex.vec(x, y),
+			anchor: ex.vec(0.5, 1),
+			z,
+		});
 		actor.graphics.use(sprite);
 		this.add(actor);
 	}

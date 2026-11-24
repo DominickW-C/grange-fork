@@ -1,10 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { MAX_INTERACTION_DISTANCE } from "../../src/world/interaction";
-import {
-	MAP_HEIGHT,
-	MAP_WIDTH,
-	TILE_SIZE,
-} from "../../src/world/mapData";
+import { MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from "../../src/world/mapData";
 
 /**
  * The page-space position of a world point.
@@ -40,9 +36,7 @@ async function worldToPage(
 	const fallbackWidth = aspect >= mapAspect ? MAP_HEIGHT * aspect : MAP_WIDTH;
 	const fallbackHeight = aspect >= mapAspect ? MAP_HEIGHT : MAP_WIDTH / aspect;
 	const viewWidth =
-		Number.isFinite(view.width) && view.width > 0
-			? view.width
-			: fallbackWidth;
+		Number.isFinite(view.width) && view.width > 0 ? view.width : fallbackWidth;
 	const viewHeight =
 		Number.isFinite(view.height) && view.height > 0
 			? view.height
@@ -90,11 +84,7 @@ export async function farmTilePosition(
 	column: number,
 	row: number,
 ): Promise<{ x: number; y: number }> {
-	return worldToPage(
-		page,
-		(column + 0.5) * TILE_SIZE,
-		(row + 0.5) * TILE_SIZE,
-	);
+	return worldToPage(page, (column + 0.5) * TILE_SIZE, (row + 0.5) * TILE_SIZE);
 }
 
 /** Moves the pointer over the center of a farm map tile. */
@@ -231,7 +221,16 @@ export async function movePlayerNear(
 ): Promise<void> {
 	try {
 		await page.evaluate(
-			({ worldX, worldY, tolerance, reach, timeout, resendMs, deadband, stallLimit }) => {
+			({
+				worldX,
+				worldY,
+				tolerance,
+				reach,
+				timeout,
+				resendMs,
+				deadband,
+				stallLimit,
+			}) => {
 				const root = document.querySelector(".farm-map-page");
 				if (!root) return;
 				const read = () => {

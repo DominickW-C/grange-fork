@@ -68,7 +68,9 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 	);
 	const [timeLeftMs, setTimeLeftMs] = useState(ROUND_MS);
 	const [feedback, setFeedback] = useState<"hit" | "miss" | null>(null);
-	const [message, setMessage] = useState("Cast your line, then match the arrows.");
+	const [message, setMessage] = useState(
+		"Cast your line, then match the arrows.",
+	);
 	const [caught, setCaught] = useState<FishDef | null>(null);
 
 	const timeouts = useRef<number[]>([]);
@@ -82,9 +84,7 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 		() => ROD_ORDER.filter((id) => countItem({ grid, hotbar }, id) > 0),
 		[grid, hotbar],
 	);
-	const equippedRod = ownedRods.includes(equippedId)
-		? equippedId
-		: STARTER_ROD;
+	const equippedRod = ownedRods.includes(equippedId) ? equippedId : STARTER_ROD;
 
 	// Hand the player their best rod when the pond opens. Rods bought at the
 	// market are restored from the server as inventory items, so without this a
@@ -180,9 +180,7 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 				const gain = comboLuckGain(rodLuck(rodRef.current));
 				setMessage(`Combo! +${gain.toFixed(2)} luck.`);
 			}
-			timeouts.current.push(
-				window.setTimeout(() => setFeedback(null), 220),
-			);
+			timeouts.current.push(window.setTimeout(() => setFeedback(null), 220));
 		},
 		[commitProgress],
 	);
@@ -262,7 +260,10 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 				{phase === "round" && (
 					<>
 						<div className="fish-timer" data-testid="fishing-timer">
-							<div className="fish-timer-fill" style={{ width: `${timePct}%` }} />
+							<div
+								className="fish-timer-fill"
+								style={{ width: `${timePct}%` }}
+							/>
 						</div>
 						<div
 							className={

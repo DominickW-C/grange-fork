@@ -45,7 +45,8 @@ export function updateWalkingPlayer(
 	worldMinX = 0,
 	worldMinY = 0,
 ): void {
-	const step = (speed * WALK_SPEED_MULTIPLIER * Math.min(delta, MAX_FRAME_STEP_MS)) / 1000;
+	const step =
+		(speed * WALK_SPEED_MULTIPLIER * Math.min(delta, MAX_FRAME_STEP_MS)) / 1000;
 	const next = moveAroundObstacles(
 		player.pos.x,
 		player.pos.y,

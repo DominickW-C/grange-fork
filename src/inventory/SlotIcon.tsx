@@ -5,6 +5,7 @@ export function SlotIcon({ itemId }: { itemId: ItemId | null }) {
 	const [failed, setFailed] = useState(false);
 	if (!itemId) return null;
 	const def = getItemDef(itemId);
+	if (!def) return null;
 	if (def.icon.startsWith("/") && !failed) {
 		return (
 			<img

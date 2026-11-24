@@ -13,6 +13,7 @@ import { selectedFarmItem } from "./fenceActions";
 import { FenceLayer } from "./fenceRendering";
 import { FencePlacementPreview } from "./FencePlacementPreview";
 import { FarmBarn } from "./FarmBarn";
+import { FarmGreenhouse } from "./FarmGreenhouse";
 import { performFarmAction } from "./farmActionRunner";
 import { ComboController } from "./farmCombo";
 import { updateFarmerGraphics } from "./farmerSprite";
@@ -74,6 +75,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private deactivated = false;
 	private readonly travel: FarmTravel;
 	private readonly barn: FarmBarn;
+	private readonly greenhouse: FarmGreenhouse;
 	private readonly fishing: FarmFishing;
 	private readonly onOpenHouse: () => void;
 	private readonly onTalkToNpc: () => void;
@@ -97,15 +99,14 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		super();
 		this.onOpenHouse = onOpenHouse;
 		this.onTalkToNpc = onTalkToNpc;
-		this.fishing = new FarmFishing(isOwner, onFish, (prompt) =>
-			onPromptChange(prompt),
-		);
+		this.fishing = new FarmFishing(isOwner, onFish, onPromptChange);
 		this.travel = new FarmTravel(
 			(prompt) => this.fishing.setTravelPrompt(prompt),
 			onAreaChange,
 			onOpenTravel,
 		);
 		this.barn = new FarmBarn(isOwner);
+		this.greenhouse = new FarmGreenhouse(isOwner);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -149,6 +150,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			blocks: this.blocks,
 			farmProps: this.farmProps,
 			barn: this.barn,
+			greenhouse: this.greenhouse,
 			placement: this.placement,
 			fencePlacement: this.fencePlacement,
 			sprinklerPlacement: this.sprinklerPlacement,
@@ -234,14 +236,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		}
 
 		const dir = this.inputManager.getMovementVector();
-		updateFarmPlayer(
-			this.player,
-			dir,
-			step,
-			this.combo.moveSpeed,
-			farm?.land_level ?? 0,
-			this.hud.landBorderHint,
-		);
+		updateFarmPlayer(this.player, dir, step, this.combo.moveSpeed, farm?.land_level ?? 0, this.hud.landBorderHint);
 		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0, engine);
 		publishViewTransform(engine, this.camera);
 		updateFarmerGraphics(this.player, dir);
@@ -249,30 +244,24 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.hud.trackPlayer(this.player.pos);
 
 		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
-		const npc = shouldShowNpc(this.isOwner)
-			? npcAnchor(this.farmProps.position("farmhouse"))
-			: null;
+		const npc = shouldShowNpc(this.isOwner) ? npcAnchor(this.farmProps.position("farmhouse")) : null;
 		this.npc?.place(npc);
-		const housePrompt = this.travel.housePrompt(
-			this.isOwner,
-			this.player.pos,
-			this.farmProps.position("farmhouse"),
-		);
 		this.travel.update(
 			this.player,
 			this.inputManager,
 			this.train,
-			gate?.prompt ?? this.barn.prompt(this.player, this.farmProps),
+			gate?.prompt ?? this.barn.prompt(this.player, this.farmProps) ?? this.greenhouse.prompt(this.player, this.farmProps),
 			npcPrompt(this.player.pos, npc),
 			this.onTalkToNpc,
-			housePrompt,
+			this.travel.housePrompt(this.isOwner, this.player.pos, this.farmProps.position("farmhouse")),
 			this.onOpenHouse,
 		);
 		if (gate && this.inputManager.consumePress("KeyE")) {
 			toggleGate(this.owner, gate.gate, (message) => this.hud.report(message));
 		}
-		// The barn claims E before fishing drains it, but only while in reach.
+		// The barn and greenhouse claim E before fishing drains it, but only while in reach.
 		this.barn.update(this.player, this.inputManager, this.farmProps);
+		this.greenhouse.update(this.player, this.inputManager, this.farmProps);
 		this.fishing.update(this.player.pos.y, this.inputManager);
 
 		if (canEditFarm(farm, this.isOwner))

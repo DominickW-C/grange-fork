@@ -64,7 +64,12 @@ export interface ActiveFarm {
 	/** Livestock owned by this farm, keyed by animal species. */
 	animals: Record<string, number>;
 	/** Individual animals placed on the map; `animals` counts only carried ones. */
-	placed_animals?: Array<{ id: number; species: "cow" | "hen" | "sheep" | "pig"; x: number; y: number }>;
+	placed_animals?: Array<{
+		id: number;
+		species: "cow" | "hen" | "sheep" | "pig";
+		x: number;
+		y: number;
+	}>;
 	land_level?: number;
 	/** Whether strangers may join this farm. */
 	is_public: boolean;
@@ -85,7 +90,23 @@ export interface ActiveFarm {
 	}>;
 	prop_inventory: Record<string, number>;
 	storage: Record<string, number>;
+	greenhouse?: GreenhouseState;
 }
+
+export interface GreenhouseState {
+	input_item: string | null;
+	input_count: number;
+	output_item: string | null;
+	output_count: number;
+	growing_crop: string | null;
+	ready_at: number | null;
+	grow_ms: number | null;
+}
+
+export type GreenhouseAction =
+	| { kind: "insert_seed"; item: string; count?: number }
+	| { kind: "take_output" }
+	| { kind: "take_input" };
 
 export type FarmPropAction =
 	| { kind: "dig"; index: number }

@@ -69,9 +69,7 @@ export function spinReels(rng: () => number = Math.random): SlotSymbol[] {
 }
 
 /** The shared symbol when all reels match, otherwise null. */
-export function winningSymbol(
-	reels: readonly SlotSymbol[],
-): SlotSymbol | null {
+export function winningSymbol(reels: readonly SlotSymbol[]): SlotSymbol | null {
 	if (reels.length !== REEL_COUNT) return null;
 	const [first] = reels;
 	return reels.every((id) => id === first) ? first : null;

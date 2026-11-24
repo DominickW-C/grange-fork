@@ -18,9 +18,7 @@ export default function ForgotPassword() {
 		setBusy(true);
 		try {
 			await requestPasswordReset(email.trim());
-			setStatus(
-				"If that address is registered, a reset link is on its way.",
-			);
+			setStatus("If that address is registered, a reset link is on its way.");
 		} catch {
 			setStatus("Could not reach the server");
 		} finally {
@@ -62,7 +60,10 @@ export default function ForgotPassword() {
 					</button>
 				</form>
 				{status && (
-					<p data-testid="forgot-status" className="mt-4 text-center text-sm text-leaf">
+					<p
+						data-testid="forgot-status"
+						className="mt-4 text-center text-sm text-leaf"
+					>
 						{status}
 					</p>
 				)}

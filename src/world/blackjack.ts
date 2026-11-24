@@ -20,12 +20,7 @@ export interface Card {
 	suit: Suit;
 }
 
-export const SUITS: readonly Suit[] = [
-	"hearts",
-	"diamonds",
-	"clubs",
-	"spades",
-];
+export const SUITS: readonly Suit[] = ["hearts", "diamonds", "clubs", "spades"];
 
 export const RANKS: readonly Rank[] = [
 	"A",
@@ -120,8 +115,7 @@ export function isSoft17(hand: readonly Card[]): boolean {
 /** Any two cards of equal value (rank or ten-value) may be split. */
 export function isSplittable(hand: readonly Card[]): boolean {
 	return (
-		hand.length === 2 &&
-		cardValue(hand[0].rank) === cardValue(hand[1].rank)
+		hand.length === 2 && cardValue(hand[0].rank) === cardValue(hand[1].rank)
 	);
 }
 

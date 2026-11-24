@@ -23,10 +23,18 @@ export function useLivestockPurchase(isOwner: boolean, username: string) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ animal: pen.id }),
 			});
-			const result = await response.json() as {
-				ok: boolean; balance?: number; owned?: number; error?: string;
+			const result = (await response.json()) as {
+				ok: boolean;
+				balance?: number;
+				owned?: number;
+				error?: string;
 			};
-			if (!response.ok || !result.ok || result.balance === undefined || result.owned === undefined) {
+			if (
+				!response.ok ||
+				!result.ok ||
+				result.balance === undefined ||
+				result.owned === undefined
+			) {
 				setMessage(result.error ?? "Purchase failed.");
 				return;
 			}
@@ -34,7 +42,8 @@ export function useLivestockPurchase(isOwner: boolean, username: string) {
 			const current = useGameStore.getState().activeFarm;
 			if (current && current.owner === username)
 				useGameStore.getState().setActiveFarm({
-					...current, animals: { ...current.animals, [pen.id]: result.owned },
+					...current,
+					animals: { ...current.animals, [pen.id]: result.owned },
 				});
 			setItemCount(pen.id, result.owned);
 			setMessage(`${pen.name} purchased! It is now in your inventory.`);

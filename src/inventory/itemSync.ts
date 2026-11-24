@@ -3,8 +3,8 @@ import type { ItemId } from "./items";
 
 /** Inventory primitives the reconciler needs, injected for testability. */
 export interface ItemReconcileActions {
-  addItem: (itemId: ItemId, count: number) => void;
-  countItem: (itemId: ItemId) => number;
+	addItem: (itemId: ItemId, count: number) => void;
+	countItem: (itemId: ItemId) => number;
 }
 
 /**
@@ -16,12 +16,12 @@ export interface ItemReconcileActions {
  * earned. Selling already removes the item locally and on the server.
  */
 export function reconcileServerItems(
-  items: Record<string, number>,
-  actions: ItemReconcileActions,
+	items: Record<string, number>,
+	actions: ItemReconcileActions,
 ): void {
-  for (const id of [...ROD_ORDER, ...FISH_ORDER]) {
-    const desired = items[id] ?? 0;
-    const actual = actions.countItem(id);
-    if (desired > actual) actions.addItem(id, desired - actual);
-  }
+	for (const id of [...ROD_ORDER, ...FISH_ORDER]) {
+		const desired = items[id] ?? 0;
+		const actual = actions.countItem(id);
+		if (desired > actual) actions.addItem(id, desired - actual);
+	}
 }

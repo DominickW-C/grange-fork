@@ -19,11 +19,27 @@
 	text-align: center;
 }
 
-.livestock-card h2 { margin: 2px 0 0; font-size: 1.4rem; }
-.livestock-card p { margin: 7px 0; }
-.livestock-price { font-size: 1.25rem; font-weight: 800; }
-.livestock-portrait { width: 106px; height: 94px; object-fit: contain; image-rendering: pixelated; }
-.livestock-message { min-height: 1.2em; font-weight: 700; }
+.livestock-card h2 {
+	margin: 2px 0 0;
+	font-size: 1.4rem;
+}
+.livestock-card p {
+	margin: 7px 0;
+}
+.livestock-price {
+	font-size: 1.25rem;
+	font-weight: 800;
+}
+.livestock-portrait {
+	width: 106px;
+	height: 94px;
+	object-fit: contain;
+	image-rendering: pixelated;
+}
+.livestock-message {
+	min-height: 1.2em;
+	font-weight: 700;
+}
 
 .livestock-close {
 	position: absolute;
@@ -48,4 +64,7 @@
 	cursor: pointer;
 }
 
-.livestock-buy:disabled { opacity: 0.55; cursor: not-allowed; }
+.livestock-buy:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}

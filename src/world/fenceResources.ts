@@ -1,9 +1,9 @@
 import * as ex from "excalibur";
 
-const fenceImage = (name: string) => new ex.ImageSource(
-	`/assets/farm/fences/${name}.webp`,
-	{ filtering: ex.ImageFiltering.Pixel },
-);
+const fenceImage = (name: string) =>
+	new ex.ImageSource(`/assets/farm/fences/${name}.webp`, {
+		filtering: ex.ImageFiltering.Pixel,
+	});
 
 export const fenceImages = {
 	post: fenceImage("post"),

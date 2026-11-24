@@ -122,9 +122,7 @@ export function evaluate5(cards: readonly Card[]): HandScore {
 	const groups = [...counts.entries()].sort(
 		(a, b) => b[1] - a[1] || b[0] - a[0],
 	);
-	const high = straightHigh(
-		[...counts.keys()].sort((a, b) => b - a),
-	);
+	const high = straightHigh([...counts.keys()].sort((a, b) => b - a));
 
 	if (isFlush && high) return { category: "straightFlush", tiebreak: [high] };
 	if (groups[0][1] === 4) {

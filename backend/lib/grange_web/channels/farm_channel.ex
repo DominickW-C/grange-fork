@@ -128,6 +128,11 @@ defmodule GrangeWeb.FarmChannel do
   end
 
   @impl true
+  def handle_in("greenhouseAction", %{"action" => action}, socket) do
+    authorize_owner(socket, fn owner -> greenhouse_act(socket, owner, action) end)
+  end
+
+  @impl true
   def handle_in("updateSettings", payload, socket) when is_map(payload) do
     authorize_owner(socket, fn owner -> update_settings(socket, owner, payload) end)
   end
@@ -312,6 +317,17 @@ defmodule GrangeWeb.FarmChannel do
       {:reply, :ok, socket}
     else
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
+  defp greenhouse_act(socket, owner, action) do
+    case FarmStore.greenhouse_action(owner, action, owner) do
+      {:ok, :ok} ->
+        reply = %{seeds: Inventory.seeds(owner)}
+        {:reply, {:ok, reply}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{error: reason}}, socket}
     end
   end
 

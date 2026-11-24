@@ -234,9 +234,7 @@ export class BlackjackTable {
 
 	private canAfford(hand: PlayerHand | null): boolean {
 		return (
-			!!hand &&
-			hand.cards.length === 2 &&
-			this.bank.getBalance() >= hand.wager
+			!!hand && hand.cards.length === 2 && this.bank.getBalance() >= hand.wager
 		);
 	}
 

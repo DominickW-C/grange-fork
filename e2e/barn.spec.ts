@@ -55,7 +55,10 @@ test("the barn stores a stack and returns it to the inventory", async ({
 
 	// Clicking a storage slot takes the stack back into the inventory.
 	await page.getByTestId("barn-slot-0").click();
-	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute("data-item", "");
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-item",
+		"",
+	);
 	await expect(page.getByTestId("barn-message")).toContainText("Took 10");
 	await expect(barnHotbar.getByTestId("slot-hotbar-1")).toHaveAttribute(
 		"data-item",
@@ -77,7 +80,9 @@ test("standing at the barn and pressing E opens storage", async ({ page }) => {
 	// Escape closes it, and the prompt remains while still at the barn.
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("barn-window")).toHaveCount(0);
-	await expect(page.getByTestId("travel-prompt")).toContainText("open the barn");
+	await expect(page.getByTestId("travel-prompt")).toContainText(
+		"open the barn",
+	);
 });
 
 test("barn storage survives a reload", async ({ page }) => {

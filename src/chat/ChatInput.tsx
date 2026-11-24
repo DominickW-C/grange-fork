@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import { usePauseStore } from "../pause/pauseStore";
+import { useGreenhouseStore } from "../world/greenhouseStore";
 import { useTravelMenuStore } from "../world/travelMenuStore";
 import { CHAT_MAX_LENGTH, sendChat } from "./chatClient";
 import { useChatStore } from "./chatStore";
@@ -27,11 +28,17 @@ export function ChatInput({ enabled }: ChatInputProps) {
 	const paused = usePauseStore((s) => s.paused);
 	const inventoryOpen = useInventoryStore((s) => s.inventoryOpen);
 	const barnOpen = useInventoryStore((s) => s.barnOpen);
+	const greenhouseOpen = useGreenhouseStore((s) => s.greenhouseOpen);
 	const travelMenuOpen = useTravelMenuStore((s) => s.open);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const available =
-		enabled && !paused && !inventoryOpen && !barnOpen && !travelMenuOpen;
+		enabled &&
+		!paused &&
+		!inventoryOpen &&
+		!barnOpen &&
+		!greenhouseOpen &&
+		!travelMenuOpen;
 
 	useEffect(() => {
 		if (!available && composing) close();

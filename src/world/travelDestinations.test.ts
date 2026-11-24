@@ -14,12 +14,7 @@ function farm(owner: string, is_public = true): FarmSummary {
 	};
 }
 
-const farms = [
-	farm("me"),
-	farm("Zed"),
-	farm("Ann"),
-	farm("Private", false),
-];
+const farms = [farm("me"), farm("Zed"), farm("Ann"), farm("Private", false)];
 
 const labels = (destinations: ReturnType<typeof trainDestinations>) =>
 	destinations.map((destination) => destination.label);
@@ -29,7 +24,11 @@ const ids = (destinations: ReturnType<typeof trainDestinations>) =>
 
 describe("trainDestinations", () => {
 	it("offers the marketplace and open farms from your own farm", () => {
-		const options = trainDestinations({ kind: "farm", owner: "me" }, farms, "me");
+		const options = trainDestinations(
+			{ kind: "farm", owner: "me" },
+			farms,
+			"me",
+		);
 
 		expect(ids(options)).toEqual(["marketplace", "farm-Ann", "farm-Zed"]);
 		expect(labels(options)).toEqual([
@@ -40,7 +39,11 @@ describe("trainDestinations", () => {
 	});
 
 	it("excludes private farms and your own farm from the list", () => {
-		const options = trainDestinations({ kind: "farm", owner: "me" }, farms, "me");
+		const options = trainDestinations(
+			{ kind: "farm", owner: "me" },
+			farms,
+			"me",
+		);
 
 		expect(ids(options)).not.toContain("farm-me");
 		expect(ids(options)).not.toContain("farm-Private");
@@ -53,15 +56,28 @@ describe("trainDestinations", () => {
 	});
 
 	it("offers home, the marketplace, and other farms from a guest farm", () => {
-		const options = trainDestinations({ kind: "farm", owner: "Ann" }, farms, "me");
+		const options = trainDestinations(
+			{ kind: "farm", owner: "Ann" },
+			farms,
+			"me",
+		);
 
 		expect(ids(options)).toEqual(["home", "marketplace", "farm-Zed"]);
 	});
 
 	it("still offers a way out of a farm that is no longer public", () => {
-		const options = trainDestinations({ kind: "farm", owner: "Private" }, farms, "me");
+		const options = trainDestinations(
+			{ kind: "farm", owner: "Private" },
+			farms,
+			"me",
+		);
 
 		// The current farm is always skipped, even when it is no longer public.
-		expect(ids(options)).toEqual(["home", "marketplace", "farm-Ann", "farm-Zed"]);
+		expect(ids(options)).toEqual([
+			"home",
+			"marketplace",
+			"farm-Ann",
+			"farm-Zed",
+		]);
 	});
 });

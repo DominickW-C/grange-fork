@@ -10,7 +10,12 @@ import {
 } from "./fenceData";
 import { moveAroundObstacles } from "./walkCollisions";
 
-const gate = (x: number, y: number, direction: "horizontal" | "vertical", open: boolean): FenceGate => ({
+const gate = (
+	x: number,
+	y: number,
+	direction: "horizontal" | "vertical",
+	open: boolean,
+): FenceGate => ({
 	x,
 	y,
 	direction,
@@ -30,17 +35,27 @@ describe("placeable fences", () => {
 
 	it("joins horizontal, vertical, and corner neighbors exactly once", () => {
 		const { nodes, edges } = buildFenceGraph([
-			{ x: 7, y: 6 }, { x: 8, y: 6 }, { x: 8, y: 7 }, { x: 8, y: 6 },
+			{ x: 7, y: 6 },
+			{ x: 8, y: 6 },
+			{ x: 8, y: 7 },
+			{ x: 8, y: 6 },
 		]);
 		expect(nodes).toHaveLength(3);
-		expect(edges.map(({ direction }) => direction)).toEqual(["horizontal", "vertical"]);
+		expect(edges.map(({ direction }) => direction)).toEqual([
+			"horizontal",
+			"vertical",
+		]);
 		expect(nodes[0]).toMatchObject({ worldX: 448, worldY: 384 });
 		expect(edges[0].to.worldX - edges[0].from.worldX).toBe(64);
 		expect(edges[1].to.worldY - edges[1].from.worldY).toBe(64);
 	});
 
 	it("removing a post also removes its connections", () => {
-		const before = [{ x: 7, y: 6 }, { x: 8, y: 6 }, { x: 9, y: 6 }];
+		const before = [
+			{ x: 7, y: 6 },
+			{ x: 8, y: 6 },
+			{ x: 9, y: 6 },
+		];
 		expect(buildFenceGraph(before).edges).toHaveLength(2);
 		const after = before.filter(({ x }) => x !== 8);
 		expect(buildFenceGraph(after).edges).toHaveLength(0);
@@ -52,20 +67,39 @@ describe("gates", () => {
 	it("prefers a horizontal neighbor, then vertical, then horizontal", () => {
 		expect(gateDirectionFor(4, 4, [{ x: 5, y: 4 }])).toBe("horizontal");
 		expect(gateDirectionFor(4, 4, [{ x: 4, y: 5 }])).toBe("vertical");
-		expect(gateDirectionFor(4, 4, [{ x: 4, y: 5 }, { x: 5, y: 4 }])).toBe("horizontal");
+		expect(
+			gateDirectionFor(4, 4, [
+				{ x: 4, y: 5 },
+				{ x: 5, y: 4 },
+			]),
+		).toBe("horizontal");
 		expect(gateDirectionFor(4, 4, [])).toBe("horizontal");
 	});
 
 	it("finds the rail a gate replaces and flags a west/north hinge", () => {
-		const { edges } = buildFenceGraph([{ x: 4, y: 4 }, { x: 5, y: 4 }]);
-		expect(gatedEdgeFor(gate(4, 4, "horizontal", false), edges)?.flipped).toBe(false);
-		expect(gatedEdgeFor(gate(5, 4, "horizontal", false), edges)?.flipped).toBe(true);
+		const { edges } = buildFenceGraph([
+			{ x: 4, y: 4 },
+			{ x: 5, y: 4 },
+		]);
+		expect(gatedEdgeFor(gate(4, 4, "horizontal", false), edges)?.flipped).toBe(
+			false,
+		);
+		expect(gatedEdgeFor(gate(5, 4, "horizontal", false), edges)?.flipped).toBe(
+			true,
+		);
 	});
 
 	it("finds the north/south rail a vertical gate replaces", () => {
-		const { edges } = buildFenceGraph([{ x: 4, y: 4 }, { x: 4, y: 5 }]);
-		expect(gatedEdgeFor(gate(4, 4, "vertical", false), edges)?.flipped).toBe(false);
-		expect(gatedEdgeFor(gate(4, 5, "vertical", false), edges)?.flipped).toBe(true);
+		const { edges } = buildFenceGraph([
+			{ x: 4, y: 4 },
+			{ x: 4, y: 5 },
+		]);
+		expect(gatedEdgeFor(gate(4, 4, "vertical", false), edges)?.flipped).toBe(
+			false,
+		);
+		expect(gatedEdgeFor(gate(4, 5, "vertical", false), edges)?.flipped).toBe(
+			true,
+		);
 	});
 
 	it("prefers the north rail when a vertical gate is fenced on both sides", () => {
@@ -92,21 +126,30 @@ describe("gates", () => {
 	});
 
 	it("keeps a gate hinge on its post in every orientation", () => {
-		expect(gateSpriteOrientation(gate(4, 4, "horizontal", false), true))
-			.toEqual({ flipHorizontal: true, flipVertical: false });
+		expect(
+			gateSpriteOrientation(gate(4, 4, "horizontal", false), true),
+		).toEqual({ flipHorizontal: true, flipVertical: false });
 		// The closed vertical art already points up on a north rail.
-		expect(gateSpriteOrientation(gate(4, 4, "vertical", false), true))
-			.toEqual({ flipHorizontal: false, flipVertical: false });
+		expect(gateSpriteOrientation(gate(4, 4, "vertical", false), true)).toEqual({
+			flipHorizontal: false,
+			flipVertical: false,
+		});
 		// A south rail mirrors the leaf so it still reaches the far post.
-		expect(gateSpriteOrientation(gate(4, 4, "vertical", false), false))
-			.toEqual({ flipHorizontal: false, flipVertical: true });
+		expect(gateSpriteOrientation(gate(4, 4, "vertical", false), false)).toEqual(
+			{ flipHorizontal: false, flipVertical: true },
+		);
 		// An open vertical gate always keeps the art's westward swing.
-		expect(gateSpriteOrientation(gate(4, 4, "vertical", true), true))
-			.toEqual({ flipHorizontal: false, flipVertical: false });
+		expect(gateSpriteOrientation(gate(4, 4, "vertical", true), true)).toEqual({
+			flipHorizontal: false,
+			flipVertical: false,
+		});
 	});
 
 	it("an open gate removes only its own rail obstacle", () => {
-		const fences = [{ x: 4, y: 4 }, { x: 5, y: 4 }];
+		const fences = [
+			{ x: 4, y: 4 },
+			{ x: 5, y: 4 },
+		];
 		const closed = fenceObstacles(fences, [gate(4, 4, "horizontal", false)]);
 		const open = fenceObstacles(fences, [gate(4, 4, "horizontal", true)]);
 		expect(closed).toHaveLength(3);

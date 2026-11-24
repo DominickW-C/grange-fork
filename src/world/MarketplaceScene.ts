@@ -54,7 +54,10 @@ export class MarketplaceScene extends WalkingScene {
 					action: onOpenTravel,
 				},
 				{
-					position: ex.vec(MARKETPLACE_BANK_ENTRANCE.x, MARKETPLACE_BANK_ENTRANCE.y),
+					position: ex.vec(
+						MARKETPLACE_BANK_ENTRANCE.x,
+						MARKETPLACE_BANK_ENTRANCE.y,
+					),
 					destination: "bank",
 					prompt: "Press E to enter the bank",
 					radius: 72,

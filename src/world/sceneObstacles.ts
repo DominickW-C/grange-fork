@@ -1,7 +1,14 @@
 import type { FenceGate } from "../../shared/types";
 import { type CasinoAssetKey, casinoProps } from "./casinoData";
 import { fenceObstacles, type FenceCoord } from "./fenceData";
-import { farmBounds, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, type PropKey, props } from "./mapData";
+import {
+	farmBounds,
+	MAP_HEIGHT,
+	MAP_WIDTH,
+	TILE_SIZE,
+	type PropKey,
+	props,
+} from "./mapData";
 import { type MarketplacePropKey, marketplaceProps } from "./marketplaceData";
 import {
 	type PropFootprint,
@@ -25,12 +32,13 @@ export const farmFootprints: Partial<Record<PropKey, PropFootprint>> = {
 };
 
 /** Flowers take up a little ground when placing props, but remain walk-through. */
-export const farmPlacementFootprints: Partial<Record<PropKey, PropFootprint>> = {
-	...farmFootprints,
-	daisies: { width: 0.25, depth: 18 },
-	marigolds: { width: 0.25, depth: 18 },
-	"blue-flowers": { width: 0.25, depth: 18 },
-};
+export const farmPlacementFootprints: Partial<Record<PropKey, PropFootprint>> =
+	{
+		...farmFootprints,
+		daisies: { width: 0.25, depth: 18 },
+		marigolds: { width: 0.25, depth: 18 },
+		"blue-flowers": { width: 0.25, depth: 18 },
+	};
 
 const marketplaceFootprints: Partial<
 	Record<MarketplacePropKey, PropFootprint>
@@ -81,16 +89,26 @@ let currentFarmGates: FenceGate[] = [];
 let currentFarmLandLevel = 0;
 function rebuildFarmObstacles(): void {
 	const bounds = farmBounds(currentFarmLandLevel);
-	const water = { left: bounds.minColumn * TILE_SIZE,
-		right: (bounds.maxColumn + 1) * TILE_SIZE, top: 11 * TILE_SIZE - 36, bottom: MAP_HEIGHT };
-	farmWalkObstacles.splice(0, Infinity,
+	const water = {
+		left: bounds.minColumn * TILE_SIZE,
+		right: (bounds.maxColumn + 1) * TILE_SIZE,
+		top: 11 * TILE_SIZE - 36,
+		bottom: MAP_HEIGHT,
+	};
+	farmWalkObstacles.splice(
+		0,
+		Infinity,
 		...propObstacles(currentFarmProps, farmFootprints),
 		...fenceObstacles(currentFarmFences, currentFarmGates),
-		water);
-	farmPlacementObstacles.splice(0, Infinity,
+		water,
+	);
+	farmPlacementObstacles.splice(
+		0,
+		Infinity,
 		...propObstacles(currentFarmProps, farmPlacementFootprints),
 		...fenceObstacles(currentFarmFences, currentFarmGates),
-		water);
+		water,
+	);
 }
 
 rebuildFarmObstacles();

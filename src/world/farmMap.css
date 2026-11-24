@@ -30,8 +30,13 @@
 	pointer-events: none;
 }
 
-.farm-hint { margin: 0.2rem 0 0; }
-.farm-status { color: #a7c957; font-weight: 700; }
+.farm-hint {
+	margin: 0.2rem 0 0;
+}
+.farm-status {
+	color: #a7c957;
+	font-weight: 700;
+}
 
 .farm-map-travel-prompt {
 	position: absolute;
@@ -76,7 +81,9 @@
 	letter-spacing: 0.03em;
 	pointer-events: none;
 	opacity: 1;
-	transition: opacity 0.35s ease, transform 0.35s ease;
+	transition:
+		opacity 0.35s ease,
+		transform 0.35s ease;
 	z-index: 30;
 }
 

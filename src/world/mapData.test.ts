@@ -76,7 +76,12 @@ describe("farm map data", () => {
 		expect(ownsFarmTile(-1, 7, 2)).toBe(true);
 		expect(ownsFarmTile(18, 7, 3)).toBe(true);
 		expect(ownsFarmTile(7, -3, 4)).toBe(true);
-		expect(farmBounds(0)).toEqual({ minColumn: 0, maxColumn: 17, minRow: 0, maxRow: 11 });
+		expect(farmBounds(0)).toEqual({
+			minColumn: 0,
+			maxColumn: 17,
+			minRow: 0,
+			maxRow: 11,
+		});
 		expect(ownsFarmTile(0, 11, 4)).toBe(false);
 	});
 
@@ -87,7 +92,9 @@ describe("farm map data", () => {
 			minRow: FARM_WORLD_MIN_ROW,
 			maxRow: FARM_WORLD_MAX_ROW,
 		});
-		expect(ownsFarmTile(FARM_WORLD_MIN_COLUMN, FARM_WORLD_MIN_ROW, 5)).toBe(true);
+		expect(ownsFarmTile(FARM_WORLD_MIN_COLUMN, FARM_WORLD_MIN_ROW, 5)).toBe(
+			true,
+		);
 		expect(ownsFarmTile(FARM_WORLD_MAX_COLUMN, 9, 5)).toBe(true);
 		expect(ownsFarmTile(FARM_WORLD_MIN_COLUMN - 1, 0, 5)).toBe(false);
 		expect(ownsFarmTile(FARM_WORLD_MAX_COLUMN + 1, 0, 5)).toBe(false);

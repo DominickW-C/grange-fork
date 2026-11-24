@@ -1,5 +1,9 @@
 import { type CropId, CROPS, cropFamily } from "../../shared/crops";
-import { decodeCrop, type FarmToolId, orthogonalNeighbors } from "../../shared/farm";
+import {
+	decodeCrop,
+	type FarmToolId,
+	orthogonalNeighbors,
+} from "../../shared/farm";
 import { mutationChance, comboSpreadChance } from "../../shared/mechanics";
 
 /** A server tile as needed for action resolution. */
@@ -98,7 +102,9 @@ export function activeFarmSynergy(
 	if (family === "wheat") {
 		return (
 			neighbors.filter(
-				(n) => isGrowing(n.state) && cropFamily(decodeCrop(n.crop).cropId) === "wheat",
+				(n) =>
+					isGrowing(n.state) &&
+					cropFamily(decodeCrop(n.crop).cropId) === "wheat",
 			).length >= 2
 		);
 	}
@@ -144,7 +150,9 @@ export function spreadTarget(
 	const wanted = kind === "water" ? "planted" : "ready";
 	const valid = orthogonalNeighbors(column, row)
 		.map(({ x, y }) => byKey.get(`${x},${y}`))
-		.filter((t): t is FarmTileListTile => t !== undefined && t.state === wanted);
+		.filter(
+			(t): t is FarmTileListTile => t !== undefined && t.state === wanted,
+		);
 	if (valid.length === 0) return null;
 	const pick = valid[Math.floor(rng() * valid.length)];
 	return { x: pick.x, y: pick.y };

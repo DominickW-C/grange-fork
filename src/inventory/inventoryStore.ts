@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { usePauseStore } from "../pause/pauseStore";
+import { useGreenhouseStore } from "../world/greenhouseStore";
 import { STARTER_ROD } from "../world/fishingData";
 import { buildAdminInventory } from "./adminInventory";
 import {
@@ -318,6 +319,7 @@ export function isInventoryBlockingInput(): boolean {
 	return (
 		useInventoryStore.getState().inventoryOpen ||
 		useInventoryStore.getState().barnOpen ||
+		useGreenhouseStore.getState().greenhouseOpen ||
 		usePauseStore.getState().paused
 	);
 }

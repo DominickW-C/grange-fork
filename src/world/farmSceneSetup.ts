@@ -1,7 +1,13 @@
 import * as ex from "excalibur";
 import { depthForY } from "./depth";
 import { addFarmerGraphics } from "./farmerSprite";
-import { FARM_PLAYER_SPAWN, farmBounds, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from "./mapData";
+import {
+	FARM_PLAYER_SPAWN,
+	farmBounds,
+	MAP_HEIGHT,
+	MAP_WIDTH,
+	TILE_SIZE,
+} from "./mapData";
 import { cameraAxis } from "./viewport";
 
 export function createFarmPlayer(scene: ex.Scene): ex.Actor {
@@ -35,11 +41,6 @@ export function followFarmPlayer(
 			bounds.minColumn * TILE_SIZE,
 			(bounds.maxColumn + 1) * TILE_SIZE,
 		),
-		cameraAxis(
-			position.y,
-			halfHeight,
-			bounds.minRow * TILE_SIZE,
-			MAP_HEIGHT,
-		),
+		cameraAxis(position.y, halfHeight, bounds.minRow * TILE_SIZE, MAP_HEIGHT),
 	);
 }

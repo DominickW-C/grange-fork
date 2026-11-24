@@ -44,7 +44,10 @@ export default function VerifyEmail() {
 				<h1 className="mb-4 text-center text-2xl text-barn-red ember-text">
 					Verify Email
 				</h1>
-				<p data-testid="verify-status" className="text-center text-sm text-cream">
+				<p
+					data-testid="verify-status"
+					className="text-center text-sm text-cream"
+				>
 					{status}
 				</p>
 			</div>

@@ -76,7 +76,11 @@ function seedItem(id: MarketItemId, crop: CropId, emoji: string): MarketItem {
 	};
 }
 
-function produceItem(id: MarketItemId, crop: CropId, emoji: string): MarketItem {
+function produceItem(
+	id: MarketItemId,
+	crop: CropId,
+	emoji: string,
+): MarketItem {
 	const { name, sellValue } = CROPS[crop];
 	return {
 		id,
@@ -146,7 +150,12 @@ export const MARKET_ITEMS = {
 	midas_wheat: produceItem("midas_wheat", "midas_wheat", "🌟"),
 	frost_lettuce: produceItem("frost_lettuce", "frost_lettuce", "❄️"),
 	sunburst_tomato: produceItem("sunburst_tomato", "sunburst_tomato", "☀️"),
-	sprinkler: toolItem("sprinkler", "💧", 75, "Waters the four tiles around it."),
+	sprinkler: toolItem(
+		"sprinkler",
+		"💧",
+		75,
+		"Waters the four tiles around it.",
+	),
 	hoe: toolItem("hoe", "⛏️", 50, "Till soil for planting."),
 	"watering-can": toolItem("watering-can", "🚿", 60, "Water planted crops."),
 	scythe: toolItem("scythe", "🌾", 80, "Harvest sturdy crops."),

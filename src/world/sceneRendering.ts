@@ -43,7 +43,8 @@ export function addTerrain(
 
 	for (let row = 0; row < rows; row += 1) {
 		for (let column = 0; column < columns; column += 1) {
-			const frame = terrainFrames[terrainAt(startColumn + column, startRow + row)];
+			const frame =
+				terrainFrames[terrainAt(startColumn + column, startRow + row)];
 			terrain
 				.getTile(column, row)
 				?.addGraphic(sheet.getSprite(frame.column, frame.row));

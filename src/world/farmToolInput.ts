@@ -9,6 +9,7 @@ import { fenceCornerAt } from "./FencePlacementPreview";
 import { actOnFence, selectedFarmItem } from "./fenceActions";
 import { ownsFenceCorner } from "./fenceData";
 import type { FarmBarn } from "./FarmBarn";
+import type { FarmGreenhouse } from "./FarmGreenhouse";
 import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
 import type { FarmPlacementPreview } from "./FarmPlacementPreview";
 import type { AnimalPlacementPreview } from "./AnimalPlacementPreview";
@@ -31,6 +32,7 @@ export interface FarmToolHost {
 	blocks: BlockRegistry;
 	farmProps: FarmPropLayer;
 	barn: FarmBarn;
+	greenhouse?: FarmGreenhouse;
 	placement: FarmPlacementPreview;
 	fencePlacement: FencePlacementPreview;
 	sprinklerPlacement: SprinklerPlacementPreview;
@@ -65,6 +67,7 @@ export class FarmToolInput {
 			if (this.disabled()) return;
 			const item = selectedFarmItem();
 			if (this.host.barn.handleClick(evt.worldPos, item, this.host.farmProps)) return;
+			if (this.host.greenhouse?.handleClick(evt.worldPos, item, this.host.farmProps)) return;
 			const farm = useGameStore.getState().activeFarm;
 			if (item && isMovablePropAsset(item) && farm) {
 				if (!this.mayMoveProps()) return this.host.reportReadOnly();

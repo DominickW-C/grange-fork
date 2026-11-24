@@ -28,6 +28,7 @@ defmodule Grange.FarmStore do
     FarmFences,
     FarmGate,
     FarmGates,
+    FarmGreenhouse,
     FarmProp,
     FarmProps,
     FarmRecord,
@@ -89,6 +90,7 @@ defmodule Grange.FarmStore do
           visitor_edit: farm.visitor_edit,
           prop_overrides: FarmProps.overrides(owner),
           prop_inventory: FarmProps.inventory(owner),
+          greenhouse: FarmGreenhouse.state(farm),
           storage: BarnStorage.inventory(farm)
         }
     end
@@ -136,6 +138,13 @@ defmodule Grange.FarmStore do
   @spec prop_action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
   def prop_action(owner, action) do
     with {:ok, :ok} <- FarmProps.action(owner, action), do: refresh(owner)
+  end
+
+  @spec greenhouse_action(String.t(), map(), String.t()) :: {:ok, :ok} | {:error, String.t()}
+  def greenhouse_action(owner, action, actor) do
+    with {:ok, :ok} <- FarmGreenhouse.action(owner, actor, action),
+         {:ok, _} <- refresh(owner),
+         do: {:ok, :ok}
   end
 
   @doc "Broadcasts the farm and returns its refreshed view."

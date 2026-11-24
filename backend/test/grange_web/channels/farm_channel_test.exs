@@ -329,6 +329,20 @@ defmodule GrangeWeb.FarmChannelTest do
     assert {:error, %{error: "Farm not found"}} = join_farm("Bob", "Nobody")
   end
 
+  test "greenhouseAction returns updated seeds in ack reply" do
+    full_farm("Alice")
+    Inventory.add("Alice", "wheat-seed", 5)
+    assert {:ok, _reply, socket} = join_farm("Alice", "Alice")
+
+    ref =
+      push(socket, "greenhouseAction", %{
+        "action" => %{"kind" => "insert_seed", "item" => "wheat-seed", "count" => 2}
+      })
+
+    assert_reply(ref, :ok, reply)
+    assert reply.seeds["wheat-seed"] == 3
+  end
+
   test "UserSocket.connect resolves the token param" do
     user = Helper.register_user("Alice")
     token = Accounts.create_session(user.id)

@@ -3,6 +3,7 @@ import type { ActiveFarm } from "../../shared/types";
 import type { BlockRegistry, TileCoord } from "./blocking";
 import { groundFootprintTiles, rectFootprintTiles } from "./blocking";
 import { withinBarnReach } from "./barnActions";
+import { withinGreenhouseReach } from "./greenhouseActions";
 import { type PlacedFarmProp, placedFarmProps } from "./farmPropData";
 import {
 	ANIMATED_PROPS,
@@ -102,6 +103,21 @@ export class FarmPropLayer {
 		);
 	}
 
+	greenhouseNear(x: number, y: number): PlacedFarmProp | null {
+		return (
+			[...this.rendered]
+				.filter(
+					({ prop, height }) =>
+						prop.asset === "greenhouse" &&
+						withinGreenhouseReach(
+							{ x, y },
+							{ x: prop.x, y: prop.y, width: prop.width, height },
+						),
+				)
+				.sort((a, b) => b.prop.y - a.prop.y)[0]?.prop ?? null
+		);
+	}
+
 	/** Where `asset` currently stands, or null while it is carried/digged up. */
 	position(asset: string): { x: number; y: number } | null {
 		const found = this.rendered.find(({ prop }) => prop.asset === asset);
@@ -118,7 +134,9 @@ export class FarmPropLayer {
 		const carried = farm.prop_overrides
 			.filter((change) => change.carried && change.asset === asset)
 			.sort((a, b) => a.index - b.index)[0];
-		const original = carried ? props[carried.index] : props.find((prop) => prop.asset === asset);
+		const original = carried
+			? props[carried.index]
+			: props.find((prop) => prop.asset === asset);
 		if (!original || original.asset !== asset) return null;
 		const source = propImages[asset];
 		const height = (source.height * original.width) / source.width;
@@ -128,8 +146,16 @@ export class FarmPropLayer {
 		)[0];
 		if (!ground) return null;
 		const placement = { x, y, width: original.width, height, ground };
-		return { ...placement, reason: propPlacementReason(placement,
-			farmPlacementObstacles, farm.tiles, player, farm.land_level) };
+		return {
+			...placement,
+			reason: propPlacementReason(
+				placement,
+				farmPlacementObstacles,
+				farm.tiles,
+				player,
+				farm.land_level,
+			),
+		};
 	}
 
 	private footprint(prop: PlacedFarmProp, height: number): TileCoord[] {

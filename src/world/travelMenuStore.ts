@@ -12,7 +12,11 @@ interface TravelMenuState {
 	title: string;
 	options: TravelMenuOption[];
 	onCancel: (() => void) | null;
-	openMenu: (title: string, options: TravelMenuOption[], onCancel: () => void) => void;
+	openMenu: (
+		title: string,
+		options: TravelMenuOption[],
+		onCancel: () => void,
+	) => void;
 	closeMenu: () => void;
 	cancelMenu: () => void;
 }

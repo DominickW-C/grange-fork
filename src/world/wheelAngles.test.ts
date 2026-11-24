@@ -16,7 +16,11 @@ function rngFrom(values: number[]): () => number {
 describe("nextSpinAngles", () => {
 	it("lands the ball on the winning pocket", () => {
 		for (const pocket of WHEEL_ORDER) {
-			const angles = nextSpinAngles({ wheel: 0, ball: 0 }, pocket, rngFrom([0.5]));
+			const angles = nextSpinAngles(
+				{ wheel: 0, ball: 0 },
+				pocket,
+				rngFrom([0.5]),
+			);
 			const pocketAngle = WHEEL_ORDER.indexOf(pocket) * WHEEL_STEP;
 			expect(mod360(angles.ball)).toBeCloseTo(
 				mod360(angles.wheel + pocketAngle),

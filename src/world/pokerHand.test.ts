@@ -136,15 +136,69 @@ describe("evaluate5", () => {
 describe("compareScores", () => {
 	it("orders categories from high card up to straight flush", () => {
 		const hands = [
-			evaluate5([card("A"), card("K", "hearts"), card("9", "clubs"), card("5", "diamonds"), card("3")]),
-			evaluate5([card("8"), card("8", "hearts"), card("A", "clubs"), card("5", "diamonds"), card("3")]),
-			evaluate5([card("K"), card("K", "hearts"), card("4", "clubs"), card("4", "diamonds"), card("Q")]),
-			evaluate5([card("7"), card("7", "hearts"), card("7", "clubs"), card("K", "diamonds"), card("2")]),
-			evaluate5([card("9"), card("8", "hearts"), card("7", "clubs"), card("6", "diamonds"), card("5", "spades")]),
-			evaluate5([card("A", "hearts"), card("J", "hearts"), card("8", "hearts"), card("5", "hearts"), card("2", "hearts")]),
-			evaluate5([card("Q"), card("Q", "hearts"), card("Q", "clubs"), card("9", "diamonds"), card("9")]),
-			evaluate5([card("4"), card("4", "hearts"), card("4", "clubs"), card("4", "diamonds"), card("A")]),
-			evaluate5([card("9", "hearts"), card("8", "hearts"), card("7", "hearts"), card("6", "hearts"), card("5", "hearts")]),
+			evaluate5([
+				card("A"),
+				card("K", "hearts"),
+				card("9", "clubs"),
+				card("5", "diamonds"),
+				card("3"),
+			]),
+			evaluate5([
+				card("8"),
+				card("8", "hearts"),
+				card("A", "clubs"),
+				card("5", "diamonds"),
+				card("3"),
+			]),
+			evaluate5([
+				card("K"),
+				card("K", "hearts"),
+				card("4", "clubs"),
+				card("4", "diamonds"),
+				card("Q"),
+			]),
+			evaluate5([
+				card("7"),
+				card("7", "hearts"),
+				card("7", "clubs"),
+				card("K", "diamonds"),
+				card("2"),
+			]),
+			evaluate5([
+				card("9"),
+				card("8", "hearts"),
+				card("7", "clubs"),
+				card("6", "diamonds"),
+				card("5", "spades"),
+			]),
+			evaluate5([
+				card("A", "hearts"),
+				card("J", "hearts"),
+				card("8", "hearts"),
+				card("5", "hearts"),
+				card("2", "hearts"),
+			]),
+			evaluate5([
+				card("Q"),
+				card("Q", "hearts"),
+				card("Q", "clubs"),
+				card("9", "diamonds"),
+				card("9"),
+			]),
+			evaluate5([
+				card("4"),
+				card("4", "hearts"),
+				card("4", "clubs"),
+				card("4", "diamonds"),
+				card("A"),
+			]),
+			evaluate5([
+				card("9", "hearts"),
+				card("8", "hearts"),
+				card("7", "hearts"),
+				card("6", "hearts"),
+				card("5", "hearts"),
+			]),
 		];
 		for (let i = 1; i < hands.length; i += 1) {
 			expect(compareScores(hands[i], hands[i - 1])).toBeGreaterThan(0);
@@ -152,8 +206,20 @@ describe("compareScores", () => {
 	});
 
 	it("treats identical ranks as a tie", () => {
-		const a = evaluate5([card("A"), card("A", "hearts"), card("K", "clubs"), card("5", "diamonds"), card("3")]);
-		const b = evaluate5([card("A", "clubs"), card("A", "diamonds"), card("K", "hearts"), card("5", "spades"), card("3", "hearts")]);
+		const a = evaluate5([
+			card("A"),
+			card("A", "hearts"),
+			card("K", "clubs"),
+			card("5", "diamonds"),
+			card("3"),
+		]);
+		const b = evaluate5([
+			card("A", "clubs"),
+			card("A", "diamonds"),
+			card("K", "hearts"),
+			card("5", "spades"),
+			card("3", "hearts"),
+		]);
 		expect(compareScores(a, b)).toBe(0);
 	});
 });

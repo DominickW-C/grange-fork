@@ -1,17 +1,33 @@
 import type { FenceGate } from "../../shared/types";
-import { fenceKey, type FenceCoord, gatedEdgeFor, fenceGraph, edgeKey } from "./fenceData";
+import {
+	fenceKey,
+	type FenceCoord,
+	gatedEdgeFor,
+	fenceGraph,
+	edgeKey,
+} from "./fenceData";
 
 /** The fence posts form a grid of vertices; each rail borders two ground cells. */
 export function enclosedPen(
-	x: number, y: number, fences: FenceCoord[], gates: FenceGate[],
+	x: number,
+	y: number,
+	fences: FenceCoord[],
+	gates: FenceGate[],
 ): boolean {
 	const { nodes, edges } = fenceGraph(fences, gates);
 	if (nodes.length < 4) return false;
-	const open = new Set(gates.filter((gate) => gate.open)
-		.map((gate) => gatedEdgeFor(gate, edges))
-		.filter((edge) => edge !== null).map(({ edge }) => edgeKey(edge)));
-	const walls = new Set(edges.filter((edge) => !open.has(edgeKey(edge)))
-		.map((edge) => edgeKey(edge)));
+	const open = new Set(
+		gates
+			.filter((gate) => gate.open)
+			.map((gate) => gatedEdgeFor(gate, edges))
+			.filter((edge) => edge !== null)
+			.map(({ edge }) => edgeKey(edge)),
+	);
+	const walls = new Set(
+		edges
+			.filter((edge) => !open.has(edgeKey(edge)))
+			.map((edge) => edgeKey(edge)),
+	);
 	const minX = Math.min(x, ...nodes.map((node) => node.x)) - 1;
 	const maxX = Math.max(x, ...nodes.map((node) => node.x));
 	const minY = Math.min(y, ...nodes.map((node) => node.y)) - 1;
@@ -31,8 +47,13 @@ export function enclosedPen(
 			[cx + 1, cy, cx + 1, cy, cx + 1, cy + 1],
 		];
 		for (const [nx, ny, ax, ay, bx, by] of around) {
-			const wall = edges.find((edge) =>
-				(edge.from.x === ax && edge.from.y === ay && edge.to.x === bx && edge.to.y === by));
+			const wall = edges.find(
+				(edge) =>
+					edge.from.x === ax &&
+					edge.from.y === ay &&
+					edge.to.x === bx &&
+					edge.to.y === by,
+			);
 			if (!wall || !walls.has(edgeKey(wall))) queue.push([nx, ny]);
 		}
 	}
@@ -41,21 +62,31 @@ export function enclosedPen(
 
 /** Adjacent enclosed cells may still be divided by a rail within the pen. */
 export function openStep(
-	x: number, y: number, nextX: number, nextY: number,
-	fences: FenceCoord[], gates: FenceGate[],
+	x: number,
+	y: number,
+	nextX: number,
+	nextY: number,
+	fences: FenceCoord[],
+	gates: FenceGate[],
 ): boolean {
 	if (Math.abs(nextX - x) + Math.abs(nextY - y) !== 1) return false;
 	const { edges } = fenceGraph(fences, gates);
-	const open = new Set(gates.filter((gate) => gate.open)
-		.map((gate) => gatedEdgeFor(gate, edges))
-		.filter((edge) => edge !== null).map(({ edge }) => edgeKey(edge)));
+	const open = new Set(
+		gates
+			.filter((gate) => gate.open)
+			.map((gate) => gatedEdgeFor(gate, edges))
+			.filter((edge) => edge !== null)
+			.map(({ edge }) => edgeKey(edge)),
+	);
 	const ax = Math.max(nextX, x);
 	const ay = Math.max(nextY, y);
-	const boundary = nextX !== x
-		? [ax, y, ax, y + 1]
-		: [x, ay, x + 1, ay];
-	return !edges.some((edge) =>
-		edge.from.x === boundary[0] && edge.from.y === boundary[1] &&
-		edge.to.x === boundary[2] && edge.to.y === boundary[3] &&
-		!open.has(edgeKey(edge)));
+	const boundary = nextX !== x ? [ax, y, ax, y + 1] : [x, ay, x + 1, ay];
+	return !edges.some(
+		(edge) =>
+			edge.from.x === boundary[0] &&
+			edge.from.y === boundary[1] &&
+			edge.to.x === boundary[2] &&
+			edge.to.y === boundary[3] &&
+			!open.has(edgeKey(edge)),
+	);
 }

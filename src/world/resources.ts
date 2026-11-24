@@ -26,20 +26,22 @@ export const smokeBigImage = image("transport/smokeBig.png");
 export const smokeImages = [smokeSmallImage, smokeMedImage, smokeBigImage];
 
 /** One image per growth stage of every registered crop. */
-export const cropStageImages: Record<CropId, ex.ImageSource[]> = Object.fromEntries(
-	(Object.keys(CROPS) as CropId[]).map((id) => [
-		id,
-		CROPS[id].stages.map((file) => image(`crops/${file}`)),
-	]),
-) as Record<CropId, ex.ImageSource[]>;
+export const cropStageImages: Record<CropId, ex.ImageSource[]> =
+	Object.fromEntries(
+		(Object.keys(CROPS) as CropId[]).map((id) => [
+			id,
+			CROPS[id].stages.map((file) => image(`crops/${file}`)),
+		]),
+	) as Record<CropId, ex.ImageSource[]>;
 
 /** Harvested-produce icon per crop, used by the inventory and hotbar. */
-export const cropHarvestedImages: Record<CropId, ex.ImageSource> = Object.fromEntries(
-	(Object.keys(CROPS) as CropId[]).map((id) => [
-		id,
-		image(`crops/${CROPS[id].harvested}`),
-	]),
-) as Record<CropId, ex.ImageSource>;
+export const cropHarvestedImages: Record<CropId, ex.ImageSource> =
+	Object.fromEntries(
+		(Object.keys(CROPS) as CropId[]).map((id) => [
+			id,
+			image(`crops/${CROPS[id].harvested}`),
+		]),
+	) as Record<CropId, ex.ImageSource>;
 
 export const scytheImages = {
 	basic: image("tools/scythe_basic.webp"),

@@ -50,9 +50,7 @@ export function useInventoryKeys(): void {
 			if (useInventoryStore.getState().barnOpen) return;
 
 			if (/^Digit[0-9]$/.test(e.code) || /^Numpad[0-9]$/.test(e.code)) {
-				const digit = Number(
-					e.code.replace("Digit", "").replace("Numpad", ""),
-				);
+				const digit = Number(e.code.replace("Digit", "").replace("Numpad", ""));
 				const index = digit === 0 ? 9 : digit - 1;
 				selectHotbar(index);
 				return;

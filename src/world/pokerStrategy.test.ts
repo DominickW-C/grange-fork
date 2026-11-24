@@ -29,7 +29,12 @@ describe("defaultDealerStrategy", () => {
 
 	it("calls a strong hand facing a bet", () => {
 		const action = defaultDealerStrategy(
-			context({ canCheck: false, callAmount: 10, currentBet: 10, strength: 0.85 }),
+			context({
+				canCheck: false,
+				callAmount: 10,
+				currentBet: 10,
+				strength: 0.85,
+			}),
 		);
 		expect(action.type).toBe("call");
 	});

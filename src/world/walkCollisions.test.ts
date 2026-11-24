@@ -77,19 +77,33 @@ describe("walking collisions", () => {
 	});
 
 	it("updates walking collision when the well is carried and placed elsewhere", () => {
-		const atWell = (box: WalkObstacle) => box.left <= 200 && box.right >= 200 &&
-			box.top <= 370 && box.bottom >= 370;
+		const atWell = (box: WalkObstacle) =>
+			box.left <= 200 &&
+			box.right >= 200 &&
+			box.top <= 370 &&
+			box.bottom >= 370;
 		expect(farmWalkObstacles.some(atWell)).toBe(true);
 		try {
-			setFarmPropObstacles(placedFarmProps([
-				{ index: 2, asset: "well", x: 0, y: 0, carried: true },
-			]));
+			setFarmPropObstacles(
+				placedFarmProps([
+					{ index: 2, asset: "well", x: 0, y: 0, carried: true },
+				]),
+			);
 			expect(farmWalkObstacles.some(atWell)).toBe(false);
-			setFarmPropObstacles(placedFarmProps([
-				{ index: 2, asset: "well", x: 480, y: 416, carried: false },
-			]));
-			expect(farmWalkObstacles.some((box) => box.left <= 480 && box.right >= 480 &&
-				box.top <= 390 && box.bottom >= 390)).toBe(true);
+			setFarmPropObstacles(
+				placedFarmProps([
+					{ index: 2, asset: "well", x: 480, y: 416, carried: false },
+				]),
+			);
+			expect(
+				farmWalkObstacles.some(
+					(box) =>
+						box.left <= 480 &&
+						box.right >= 480 &&
+						box.top <= 390 &&
+						box.bottom >= 390,
+				),
+			).toBe(true);
 		} finally {
 			setFarmPropObstacles(props);
 		}

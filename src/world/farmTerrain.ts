@@ -32,7 +32,12 @@ export interface FarmTerrain {
 export function buildTerrain(level = 0): FarmTerrain {
 	const sheet = ex.SpriteSheet.fromImageSource({
 		image: terrainImage,
-		grid: { rows: 4, columns: 4, spriteWidth: TILE_SIZE, spriteHeight: TILE_SIZE },
+		grid: {
+			rows: 4,
+			columns: 4,
+			spriteWidth: TILE_SIZE,
+			spriteHeight: TILE_SIZE,
+		},
 	});
 	const tileMap = new ex.TileMap({
 		pos: ex.vec(

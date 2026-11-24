@@ -65,7 +65,12 @@ describe("fishing game", () => {
 
 	it("builds a fresh four-arrow sequence", () => {
 		expect(nextSequence(() => 0)).toEqual(["up", "up", "up", "up"]);
-		expect(nextSequence(() => 0.999)).toEqual(["right", "right", "right", "right"]);
+		expect(nextSequence(() => 0.999)).toEqual([
+			"right",
+			"right",
+			"right",
+			"right",
+		]);
 		expect(nextSequence()).toHaveLength(COMBO_LENGTH);
 		expect(newComboProgress(() => 0)).toEqual({
 			sequence: ["up", "up", "up", "up"],

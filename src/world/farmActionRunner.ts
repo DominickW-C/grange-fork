@@ -37,7 +37,11 @@ export function performFarmAction(
 	const inventory = useInventoryStore.getState();
 	const item = inventory.hotbar[inventory.selectedHotbar]?.itemId ?? null;
 	const tool = farmToolForItem(item);
-	if (tool === "hoe" && !tile && !ownsFarmTile(column, row, farm?.land_level ?? 0)) {
+	if (
+		tool === "hoe" &&
+		!tile &&
+		!ownsFarmTile(column, row, farm?.land_level ?? 0)
+	) {
 		feedback.message("Buy this land from the mayor first.");
 		return;
 	}

@@ -141,13 +141,7 @@ describe("BlackjackTable outcomes", () => {
 
 describe("BlackjackTable double and split", () => {
 	it("doubles the wager and draws exactly one card", () => {
-		const { table, balance } = setup([
-			c("9"),
-			c("9"),
-			c("5"),
-			c("6"),
-			c("10"),
-		]);
+		const { table, balance } = setup([c("9"), c("9"), c("5"), c("6"), c("10")]);
 		table.deal();
 		expect(table.snapshot().canDouble).toBe(true);
 		expect(table.double()).toBe(true);
@@ -220,13 +214,7 @@ describe("BlackjackTable double and split", () => {
 
 describe("BlackjackTable dealer rules", () => {
 	it("hits on a soft 17", () => {
-		const { table, balance } = setup([
-			c("A"),
-			c("6"),
-			c("10"),
-			c("8"),
-			c("3"),
-		]);
+		const { table, balance } = setup([c("A"), c("6"), c("10"), c("8"), c("3")]);
 		table.deal();
 		table.stand();
 		const snap = table.snapshot();

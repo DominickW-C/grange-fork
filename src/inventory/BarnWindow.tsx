@@ -123,8 +123,8 @@ export function BarnWindow({ owner, onClose }: Props) {
 					</section>
 				</div>
 				<p className="inv-hint barn-hint">
-					Drag stacks between panels · Shift+E stores the selected hotbar
-					stack · click storage to take it back
+					Drag stacks between panels · Shift+E stores the selected hotbar stack
+					· click storage to take it back
 				</p>
 				{message && (
 					<p className="barn-message" data-testid="barn-message">

@@ -44,9 +44,24 @@ export const casinoProps: RenderedProp<CasinoAssetKey>[] = [
 	{ asset: "wall-post", x: 34, y: 185, width: 55 },
 	{ asset: "wall-post", x: 1118, y: 185, width: 55 },
 
-	{ asset: "poker-table", x: CASINO_POKER_TABLE.x, y: CASINO_POKER_TABLE.y, width: 250 },
-	{ asset: "blackjack-table", x: CASINO_BLACKJACK_TABLE.x, y: CASINO_BLACKJACK_TABLE.y, width: 265 },
-	{ asset: "roulette-table", x: CASINO_ROULETTE_TABLE.x, y: CASINO_ROULETTE_TABLE.y, width: 260 },
+	{
+		asset: "poker-table",
+		x: CASINO_POKER_TABLE.x,
+		y: CASINO_POKER_TABLE.y,
+		width: 250,
+	},
+	{
+		asset: "blackjack-table",
+		x: CASINO_BLACKJACK_TABLE.x,
+		y: CASINO_BLACKJACK_TABLE.y,
+		width: 265,
+	},
+	{
+		asset: "roulette-table",
+		x: CASINO_ROULETTE_TABLE.x,
+		y: CASINO_ROULETTE_TABLE.y,
+		width: 260,
+	},
 	{ asset: "chair-front-left", x: 205, y: 535, width: 70 },
 	{ asset: "chair-front-right", x: 576, y: 535, width: 72 },
 	{ asset: "chair-front-right", x: 947, y: 535, width: 72 },

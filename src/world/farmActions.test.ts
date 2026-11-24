@@ -44,7 +44,10 @@ describe("spreadTarget", () => {
 
 	it("picks an eligible neighbour by action type", () => {
 		expect(spreadTarget(tiles, 2, 2, "water", () => 0)).toEqual({ x: 2, y: 1 });
-		expect(spreadTarget(tiles, 2, 2, "harvest", () => 0)).toEqual({ x: 1, y: 2 });
+		expect(spreadTarget(tiles, 2, 2, "harvest", () => 0)).toEqual({
+			x: 1,
+			y: 2,
+		});
 	});
 
 	it("returns null when no neighbour qualifies", () => {
@@ -71,16 +74,24 @@ describe("maybeSpread", () => {
 describe("synergy and mutation", () => {
 	it("detects tomato companion synergy with no crowding", () => {
 		const tile = { x: 2, y: 2, state: "ready" as const, crop: "tomato" };
-		expect(activeFarmSynergy(tile, [tile, { x: 2, y: 1, state: "ready", crop: "lettuce" }])).toBe(
-			true,
-		);
-		expect(activeFarmSynergy(tile, [tile, { x: 2, y: 1, state: "ready", crop: "tomato" }])).toBe(
-			false,
-		);
+		expect(
+			activeFarmSynergy(tile, [
+				tile,
+				{ x: 2, y: 1, state: "ready", crop: "lettuce" },
+			]),
+		).toBe(true);
+		expect(
+			activeFarmSynergy(tile, [
+				tile,
+				{ x: 2, y: 1, state: "ready", crop: "tomato" },
+			]),
+		).toBe(false);
 	});
 
 	it("rolls mutation seeds only for standard crops", () => {
-		expect(rollMutation("lettuce", 15, true, () => 0)).toBe("frost-lettuce-seed");
+		expect(rollMutation("lettuce", 15, true, () => 0)).toBe(
+			"frost-lettuce-seed",
+		);
 		expect(rollMutation("midas_wheat", 15, true, () => 0)).toBeNull();
 		expect(rollMutation("lettuce", 0, false, () => 0.9)).toBeNull();
 	});

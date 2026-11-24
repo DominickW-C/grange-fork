@@ -37,7 +37,8 @@ export const CATEGORY_STRENGTH: Record<HandCategory, number> = {
 /** A raise of at least the minimum, sized as a fraction of the pot. */
 function raiseTo(context: DealerContext, fraction: number): DealerAction {
 	const target = Math.floor(
-		context.currentBet + Math.max(context.minRaiseTo - context.currentBet, context.pot * fraction),
+		context.currentBet +
+			Math.max(context.minRaiseTo - context.currentBet, context.pot * fraction),
 	);
 	return { type: "raise", amount: Math.min(target, context.maxRaiseTo) };
 }

@@ -124,7 +124,11 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 			: "No win";
 
 	return (
-		<div className="sl-overlay" data-testid="slots-overlay" data-phase={snapshot.phase}>
+		<div
+			className="sl-overlay"
+			data-testid="slots-overlay"
+			data-phase={snapshot.phase}
+		>
 			<div className="sl-panel" role="dialog" aria-label="Slot machine">
 				<header className="sl-header">
 					<h2 className="sl-title">Slots</h2>

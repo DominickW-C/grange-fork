@@ -61,7 +61,8 @@ export class CropLayer {
 
 		const { cropId } = decodeCrop(tile.crop);
 		const stage = serverStageIndex(tile, now);
-		if (existing && existing.cropId === cropId && existing.stage === stage) return;
+		if (existing && existing.cropId === cropId && existing.stage === stage)
+			return;
 
 		const source = cropStageImages[cropId][stage];
 		const sprite = source.toSprite();

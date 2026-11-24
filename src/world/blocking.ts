@@ -1,8 +1,4 @@
-import {
-	TILE_SIZE,
-	propBlocking,
-	type MapProp,
-} from "./mapData";
+import { TILE_SIZE, propBlocking, type MapProp } from "./mapData";
 
 export interface TileCoord {
 	column: number;
@@ -24,19 +20,10 @@ export function rectFootprintTiles(
 	height: number,
 ): TileCoord[] {
 	const tiles: TileCoord[] = [];
-	const left = Math.max(
-		-2,
-		Math.floor((x - width / 2) / TILE_SIZE),
-	);
-	const right = Math.min(
-		19,
-		Math.floor((x + width / 2 - 0.001) / TILE_SIZE),
-	);
+	const left = Math.max(-2, Math.floor((x - width / 2) / TILE_SIZE));
+	const right = Math.min(19, Math.floor((x + width / 2 - 0.001) / TILE_SIZE));
 	const top = Math.max(-4, Math.floor((y - height) / TILE_SIZE));
-	const bottom = Math.min(
-		11,
-		Math.floor((y - 0.001) / TILE_SIZE),
-	);
+	const bottom = Math.min(11, Math.floor((y - 0.001) / TILE_SIZE));
 	for (let row = top; row <= bottom; row += 1) {
 		for (let column = left; column <= right; column += 1) {
 			tiles.push({ column, row });

@@ -8,8 +8,11 @@ export type BankDesk = "teller" | "mayor";
 
 /** The interior artwork includes both characters and their labeled desks. */
 export class BankScene extends WalkingScene {
-	constructor(onPromptChange: (prompt: string | null) => void,
-		onAreaChange: (area: WorldArea) => void, onTalk: (desk: BankDesk) => void) {
+	constructor(
+		onPromptChange: (prompt: string | null) => void,
+		onAreaChange: (area: WorldArea) => void,
+		onTalk: (desk: BankDesk) => void,
+	) {
 		super({
 			area: "Bank",
 			spawn: ex.vec(576, 675),
@@ -19,13 +22,28 @@ export class BankScene extends WalkingScene {
 				{ left: 971, right: 1152, top: 0, bottom: 768 },
 			],
 			interactions: [
-				{ position: ex.vec(576, 714), destination: "marketplace",
-					destinationSpawn: { x: MARKETPLACE_BANK_ENTRANCE.x, y: MARKETPLACE_BANK_ENTRANCE.y + 60 },
-					prompt: "Press E to leave the bank", radius: 60 },
-				{ position: ex.vec(470, 472), prompt: "Press E to talk to bank teller",
-					radius: 125, action: () => onTalk("teller") },
-				{ position: ex.vec(876, 472), prompt: "Press E to talk to mayor",
-					radius: 125, action: () => onTalk("mayor") },
+				{
+					position: ex.vec(576, 714),
+					destination: "marketplace",
+					destinationSpawn: {
+						x: MARKETPLACE_BANK_ENTRANCE.x,
+						y: MARKETPLACE_BANK_ENTRANCE.y + 60,
+					},
+					prompt: "Press E to leave the bank",
+					radius: 60,
+				},
+				{
+					position: ex.vec(470, 472),
+					prompt: "Press E to talk to bank teller",
+					radius: 125,
+					action: () => onTalk("teller"),
+				},
+				{
+					position: ex.vec(876, 472),
+					prompt: "Press E to talk to mayor",
+					radius: 125,
+					action: () => onTalk("mayor"),
+				},
 			],
 			onAreaChange,
 			onPromptChange,
@@ -38,11 +56,21 @@ export class BankScene extends WalkingScene {
 		this.addPlayer();
 	}
 
-	private addImage(source: ex.ImageSource, x: number, y: number, width: number, z: number): void {
+	private addImage(
+		source: ex.ImageSource,
+		x: number,
+		y: number,
+		width: number,
+		z: number,
+	): void {
 		const sprite = source.toSprite();
 		const scale = width / source.width;
 		sprite.scale = ex.vec(scale, scale);
-		const actor = new ex.Actor({ pos: ex.vec(x, y), anchor: ex.vec(0.5, 1), z });
+		const actor = new ex.Actor({
+			pos: ex.vec(x, y),
+			anchor: ex.vec(0.5, 1),
+			z,
+		});
 		actor.graphics.use(sprite);
 		this.add(actor);
 	}

@@ -53,8 +53,20 @@ defmodule Grange.FarmProps do
 
   def dig(owner, index) when is_integer(index) do
     case @assets[index] do
-      nil -> {:error, "that object cannot be dug up"}
-      {asset, _width} -> dig_known(owner, index, asset)
+      nil ->
+        {:error, "that object cannot be dug up"}
+
+      {"greenhouse", _width} ->
+        farm = Repo.get(FarmRecord, owner)
+
+        if farm && not Grange.FarmGreenhouse.empty?(farm) do
+          {:error, "empty the greenhouse before moving it"}
+        else
+          dig_known(owner, index, "greenhouse")
+        end
+
+      {asset, _width} ->
+        dig_known(owner, index, asset)
     end
   end
 

@@ -7,7 +7,9 @@ import {
 	type MovablePropKey,
 } from "./mapData";
 
-export interface PlacedFarmProp extends MapProp { index: number }
+export interface PlacedFarmProp extends MapProp {
+	index: number;
+}
 type Override = ActiveFarm["prop_overrides"][number];
 
 /** Apply per-farm overrides to the shared starter layout; the train stays fixed. */
@@ -16,10 +18,15 @@ export function placedFarmProps(overrides: Override[]): PlacedFarmProp[] {
 	return props.flatMap((original, index) => {
 		const change = byIndex.get(index);
 		if (STARTER_CARRIED_PROPS.has(index)) {
-			if (!change || change.asset !== original.asset || change.carried) return [];
+			if (!change || change.asset !== original.asset || change.carried)
+				return [];
 			return [{ ...original, x: change.x, y: change.y, index }];
 		}
-		if (!change || original.asset === "starter-train" || change.asset !== original.asset)
+		if (
+			!change ||
+			original.asset === "starter-train" ||
+			change.asset !== original.asset
+		)
 			return [{ ...original, index }];
 		if (change.carried) return [];
 		return [{ ...original, x: change.x, y: change.y, index }];

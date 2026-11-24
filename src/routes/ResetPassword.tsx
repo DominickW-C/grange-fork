@@ -67,7 +67,10 @@ export default function ResetPassword() {
 					</button>
 				</form>
 				{status && (
-					<p data-testid="reset-status" className="mt-4 text-center text-sm text-leaf">
+					<p
+						data-testid="reset-status"
+						className="mt-4 text-center text-sm text-leaf"
+					>
 						{status}
 					</p>
 				)}

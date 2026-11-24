@@ -88,7 +88,10 @@
 		2px 2px 0 #17110a,
 		-1px -1px 0 #17110a,
 		0 3px 6px rgba(0, 0, 0, 0.6);
-	transition: color 110ms ease, transform 110ms ease, text-shadow 110ms ease;
+	transition:
+		color 110ms ease,
+		transform 110ms ease,
+		text-shadow 110ms ease;
 }
 
 .menu-account-button:hover,
@@ -130,7 +133,10 @@
 		2px 2px 0 #17110a,
 		-1px -1px 0 #17110a,
 		0 3px 6px rgba(0, 0, 0, 0.65);
-	transition: color 110ms ease, transform 110ms ease, text-shadow 110ms ease;
+	transition:
+		color 110ms ease,
+		transform 110ms ease,
+		text-shadow 110ms ease;
 }
 
 .menu-button:hover,

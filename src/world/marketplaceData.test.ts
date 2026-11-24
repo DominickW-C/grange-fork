@@ -16,9 +16,9 @@ describe("marketplace map data", () => {
 	it("leaves open construction space to the left and above", () => {
 		expect(MARKETPLACE_MIN_COLUMN).toBeLessThan(0);
 		expect(MARKETPLACE_MIN_ROW).toBeLessThan(0);
-		expect(marketplaceTerrainAt(MARKETPLACE_MIN_COLUMN, MARKETPLACE_MIN_ROW)).toBe(
-			"grass",
-		);
+		expect(
+			marketplaceTerrainAt(MARKETPLACE_MIN_COLUMN, MARKETPLACE_MIN_ROW),
+		).toBe("grass");
 		expect(MARKETPLACE_WIDTH).toBe(2048);
 	});
 

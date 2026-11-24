@@ -20,9 +20,14 @@ export function canRearrangeProps(isOwner: boolean): boolean {
 }
 
 /** Returns true when the click was handled as a prop pickup/placement. */
-export function handleFarmPropClick(item: string | null, pos: Vector,
-	layer: FarmPropLayer, farm: ActiveFarm | null, owner: string,
-	report: (message: string) => void): boolean {
+export function handleFarmPropClick(
+	item: string | null,
+	pos: Vector,
+	layer: FarmPropLayer,
+	farm: ActiveFarm | null,
+	owner: string,
+	report: (message: string) => void,
+): boolean {
 	if (!farm) return false;
 	if (item === "shovel") {
 		const target = layer.pick(pos.x, pos.y);
@@ -32,16 +37,25 @@ export function handleFarmPropClick(item: string | null, pos: Vector,
 			return true;
 		}
 		emitFarmPropAction(owner, { kind: "dig", index: target.index }, (result) =>
-			report(result.ok ? `${target.asset} moved to inventory.` :
-				result.error ?? "Could not dig up object."));
+			report(
+				result.ok
+					? `${target.asset} moved to inventory.`
+					: (result.error ?? "Could not dig up object."),
+			),
+		);
 		return true;
 	}
 	return false;
 }
 
 /** The release point is authoritative: never move the object to an unseen spot. */
-export function placeFarmProp(item: MovablePropKey, placement: PropPlacement,
-	farm: ActiveFarm, owner: string, report: (message: string) => void): void {
+export function placeFarmProp(
+	item: MovablePropKey,
+	placement: PropPlacement,
+	farm: ActiveFarm,
+	owner: string,
+	report: (message: string) => void,
+): void {
 	if ((farm.prop_inventory[item] ?? 0) <= 0) {
 		report(`No ${item} in inventory.`);
 		return;
@@ -50,7 +64,14 @@ export function placeFarmProp(item: MovablePropKey, placement: PropPlacement,
 		report(placement.reason);
 		return;
 	}
-	emitFarmPropAction(owner, { kind: "place", asset: item, x: placement.x, y: placement.y }, (result) =>
-		report(result.ok ? `${item} placed.` :
-			result.error ?? "Could not place object."));
+	emitFarmPropAction(
+		owner,
+		{ kind: "place", asset: item, x: placement.x, y: placement.y },
+		(result) =>
+			report(
+				result.ok
+					? `${item} placed.`
+					: (result.error ?? "Could not place object."),
+			),
+	);
 }

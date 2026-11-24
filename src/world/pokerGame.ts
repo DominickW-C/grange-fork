@@ -1,4 +1,9 @@
-import { CATEGORY_LABEL, bestHand, compareScores, rankValue } from "./pokerHand";
+import {
+	CATEGORY_LABEL,
+	bestHand,
+	compareScores,
+	rankValue,
+} from "./pokerHand";
 import { CATEGORY_STRENGTH, type DealerContext } from "./pokerStrategy";
 import { PokerTableBase } from "./pokerTableBase";
 import type { PokerSnapshot } from "./pokerTypes";

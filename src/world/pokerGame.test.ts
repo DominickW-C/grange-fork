@@ -95,7 +95,10 @@ describe("PokerTable blinds and dealing", () => {
 
 	it("will not start without enough for the big blind", () => {
 		const { bank } = makeBank(8);
-		const table = new PokerTable(bank, { deck: runoutDeck, strategy: alwaysCheck });
+		const table = new PokerTable(bank, {
+			deck: runoutDeck,
+			strategy: alwaysCheck,
+		});
 		expect(table.startHand()).toBe(false);
 		expect(table.snapshot().message).toMatch(/big blind/);
 	});

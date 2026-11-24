@@ -9,7 +9,12 @@ import {
 	symbolDef,
 	winningSymbol,
 } from "./slots";
-import type { Bank, SlotsOptions, SlotsPhase, SlotsSnapshot } from "./slotsTypes";
+import type {
+	Bank,
+	SlotsOptions,
+	SlotsPhase,
+	SlotsSnapshot,
+} from "./slotsTypes";
 
 /**
  * A three-reel slot machine. The stake is withdrawn from the bank on spin and
@@ -121,7 +126,8 @@ export class SlotMachine {
 
 	private resultMessage(): string {
 		if (!this.win) return `No match — you lost $${this.bet}.`;
-		if (this.win === "seven") return `JACKPOT! Three sevens pay $${this.payout}.`;
+		if (this.win === "seven")
+			return `JACKPOT! Three sevens pay $${this.payout}.`;
 		return `Three ${symbolDef(this.win).label}s — you won $${this.payout}.`;
 	}
 }

@@ -16,10 +16,50 @@ export interface LivestockPen {
 
 /** Each pen opens toward the center aisle, leaving a clear route from the door. */
 export const livestockPens: readonly LivestockPen[] = [
-	{ id: "cow", name: "Cow", price: 120, x: 300, y: 365, approachX: 503, approachY: 295, width: 330, animalWidth: 105 },
-	{ id: "hen", name: "Hen", price: 25, x: 852, y: 365, approachX: 649, approachY: 295, width: 330, animalWidth: 78 },
-	{ id: "sheep", name: "Sheep", price: 70, x: 300, y: 565, approachX: 503, approachY: 495, width: 330, animalWidth: 105 },
-	{ id: "pig", name: "Pig", price: 55, x: 852, y: 565, approachX: 649, approachY: 495, width: 330, animalWidth: 98 },
+	{
+		id: "cow",
+		name: "Cow",
+		price: 120,
+		x: 300,
+		y: 365,
+		approachX: 503,
+		approachY: 295,
+		width: 330,
+		animalWidth: 105,
+	},
+	{
+		id: "hen",
+		name: "Hen",
+		price: 25,
+		x: 852,
+		y: 365,
+		approachX: 649,
+		approachY: 295,
+		width: 330,
+		animalWidth: 78,
+	},
+	{
+		id: "sheep",
+		name: "Sheep",
+		price: 70,
+		x: 300,
+		y: 565,
+		approachX: 503,
+		approachY: 495,
+		width: 330,
+		animalWidth: 105,
+	},
+	{
+		id: "pig",
+		name: "Pig",
+		price: 55,
+		x: 852,
+		y: 565,
+		approachX: 649,
+		approachY: 495,
+		width: 330,
+		animalWidth: 98,
+	},
 ];
 
 export const LIVESTOCK_EXIT = { x: 576, y: 645 } as const;

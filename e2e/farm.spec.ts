@@ -322,7 +322,9 @@ test("a visitor sees another farm read-only but can toggle its gates", async ({
 	);
 });
 
-test("greenhouse starts in inventory, places on clear ground, and shovels up", async ({ page }) => {
+test("greenhouse starts in inventory, places on clear ground, and shovels up", async ({
+	page,
+}) => {
 	await registerFast(page, uniqueName("Gardener"));
 
 	const slot = page.locator('[data-item="greenhouse"]');

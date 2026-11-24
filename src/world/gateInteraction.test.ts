@@ -23,10 +23,10 @@ describe("gate interaction", () => {
 
 	it("ignores gates outside the interaction radius and picks the closest", () => {
 		expect(nearbyGate([gate(4, 4, false)], { x: 0, y: 0 })).toBeNull();
-		const nearby = nearbyGate(
-			[gate(4, 4, false), gate(5, 4, true)],
-			{ x: 340, y: 288 },
-		);
+		const nearby = nearbyGate([gate(4, 4, false), gate(5, 4, true)], {
+			x: 340,
+			y: 288,
+		});
 		expect(nearby?.gate).toMatchObject({ x: 5, y: 4 });
 	});
 });

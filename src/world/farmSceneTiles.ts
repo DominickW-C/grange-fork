@@ -72,6 +72,13 @@ export class FarmTileSync {
 		row: number,
 		tile: ActiveFarm["tiles"][number] | undefined,
 	): void {
-		refreshTile(this.deps.terrain, this.deps.sheet, this.deps.crops, column, row, tile);
+		refreshTile(
+			this.deps.terrain,
+			this.deps.sheet,
+			this.deps.crops,
+			column,
+			row,
+			tile,
+		);
 	}
 }

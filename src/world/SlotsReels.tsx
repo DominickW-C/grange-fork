@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-	REEL_COUNT,
-	SLOT_SYMBOLS,
-	type SlotSymbol,
-	symbolDef,
-} from "./slots";
+import { REEL_COUNT, SLOT_SYMBOLS, type SlotSymbol, symbolDef } from "./slots";
 import type { SlotsPhase } from "./slotsTypes";
 import { e2eMs } from "./testMode";
 

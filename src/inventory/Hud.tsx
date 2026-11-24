@@ -2,6 +2,7 @@ import { NotificationFeed } from "../notifications/NotificationFeed";
 import { usePauseStore } from "../pause/pauseStore";
 import { BarnOverlay } from "../world/BarnOverlay";
 import { EconomyHUD } from "../world/EconomyHUD";
+import { GreenhouseOverlay } from "../world/GreenhouseOverlay";
 import type { FarmHoveredTile } from "../world/farmHud";
 import { Hotbar } from "./Hotbar";
 import { useInventoryStore } from "./inventoryStore";
@@ -61,6 +62,7 @@ export function Hud({ tiles, hovered, chatEnabled }: HudProps) {
 			</div>
 
 			<BarnOverlay />
+			<GreenhouseOverlay />
 		</div>
 	);
 }

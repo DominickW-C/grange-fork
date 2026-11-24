@@ -50,9 +50,24 @@ export class SprinklerLayer {
 		}
 		this.actors = sprinklers.map((sprinkler, index) => {
 			const corner = sprinklerCorner(sprinkler.x, sprinkler.y);
-			const base = this.makeActor(sprinklerBaseImage, corner, SPRINKLER_WIDTH, BASE_Z);
-			const rotor = this.makeActor(sprinklerRotorImage, corner, SPRINKLER_WIDTH, ROTOR_Z);
-			const water = this.makeActor(sprinklerWaterImage, corner, WATER_WIDTH, WATER_Z);
+			const base = this.makeActor(
+				sprinklerBaseImage,
+				corner,
+				SPRINKLER_WIDTH,
+				BASE_Z,
+			);
+			const rotor = this.makeActor(
+				sprinklerRotorImage,
+				corner,
+				SPRINKLER_WIDTH,
+				ROTOR_Z,
+			);
+			const water = this.makeActor(
+				sprinklerWaterImage,
+				corner,
+				WATER_WIDTH,
+				WATER_Z,
+			);
 			water.graphics.opacity = 0;
 			// Stagger the sprays so a field of sprinklers does not pulse in unison.
 			return { base, rotor, water, clock: 0, offset: (index % 4) * 260 };
